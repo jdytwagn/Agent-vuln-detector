@@ -1,0 +1,130 @@
+- rule_id: C_RULE_001
+  cwe: CWE-120
+  owasp: A03:2021-Injection
+  name: Unsafe buffer copy
+  severity: high
+  sink_pattern: strcpy
+  source_types: argv, stdin, file, network, environment, parameter
+  sink_types: memory_copy
+  preconditions: destination buffer size unknown, source length unchecked
+  filters: strlen, sizeof, strncpy, snprintf, validate
+  tags: buffer-overflow, memory-safety
+  description: Copies data into a destination buffer without an explicit length bound.
+  recommendation: Use bounded copy routines and validate destination buffer size.
+- rule_id: C_RULE_002
+  cwe: CWE-120
+  owasp: A03:2021-Injection
+  name: Unsafe buffer concatenation
+  severity: high
+  sink_pattern: strcat
+  source_types: argv, stdin, file, network, environment, parameter
+  sink_types: memory_concat
+  preconditions: remaining destination capacity unknown
+  filters: strlen, sizeof, strncat, validate
+  tags: buffer-overflow, memory-safety
+  description: Concatenates data without proving that the destination has enough capacity.
+  recommendation: Use bounded concatenation and check remaining capacity.
+- rule_id: C_RULE_003
+  cwe: CWE-134
+  owasp: A03:2021-Injection
+  name: Unbounded formatted output
+  severity: high
+  sink_pattern: sprintf
+  source_types: argv, stdin, file, network, environment, parameter
+  sink_types: format_output
+  preconditions: output buffer length not enforced
+  filters: snprintf, sizeof, validate
+  tags: buffer-overflow, format
+  description: Writes formatted data without a maximum output length.
+  recommendation: Prefer snprintf and validate the output buffer length.
+- rule_id: C_RULE_004
+  cwe: CWE-242
+  owasp: A04:2021-Insecure Design
+  name: Dangerous input function
+  severity: critical
+  sink_pattern: gets
+  source_types: stdin
+  sink_types: input
+  preconditions: input length unbounded
+  filters: fgets
+  tags: unsafe-api, input
+  description: Reads input without bounds and cannot be used safely.
+  recommendation: Replace gets with fgets or another bounded input routine.
+- rule_id: C_RULE_005
+  cwe: CWE-78
+  owasp: A03:2021-Injection
+  name: Command execution sink
+  severity: critical
+  sink_pattern: system
+  source_types: argv, stdin, file, network, environment, parameter
+  sink_types: command_execution
+  preconditions: command string is attacker-controlled
+  filters: allowlist, validate, escape
+  tags: command-injection, injection
+  description: Executes a shell command that may be attacker-controlled.
+  recommendation: Avoid shell execution or validate command arguments with an allowlist.
+- rule_id: C_RULE_006
+  cwe: CWE-78
+  owasp: A03:2021-Injection
+  name: Process execution sink
+  severity: critical
+  sink_pattern: popen
+  source_types: argv, stdin, file, network, environment, parameter
+  sink_types: command_execution
+  preconditions: command string is attacker-controlled
+  filters: allowlist, validate, escape
+  tags: command-injection, injection
+  description: Opens a process through a shell command that may be attacker-controlled.
+  recommendation: Avoid shell invocation and pass validated arguments to safer APIs.
+- rule_id: C_RULE_007
+  cwe: CWE-22
+  owasp: A01:2021-Broken Access Control
+  name: Path-sensitive file open
+  severity: medium
+  sink_pattern: fopen
+  source_types: argv, stdin, file, network, environment, parameter
+  sink_types: file_access
+  preconditions: path may cross trust boundary
+  filters: realpath, allowlist, base directory check
+  tags: path-traversal, file
+  description: Opens a file path that may be influenced by untrusted input.
+  recommendation: Canonicalize paths and enforce an allowlist or base directory.
+- rule_id: C_RULE_008
+  cwe: CWE-252
+  owasp: A04:2021-Insecure Design
+  name: Potential unchecked allocation
+  severity: medium
+  sink_pattern: malloc
+  source_types: internal, parameter
+  sink_types: memory_allocation
+  preconditions: allocation result may be dereferenced
+  filters: null check, error handling
+  tags: unchecked-return, memory-safety
+  description: Allocated memory should be checked before dereference.
+  recommendation: Check allocation results and handle failure before use.
+- rule_id: C_RULE_009
+  cwe: CWE-416
+  owasp: A04:2021-Insecure Design
+  name: Potential use-after-free precursor
+  severity: high
+  sink_pattern: free
+  source_types: internal, parameter
+  sink_types: memory_lifetime
+  preconditions: pointer may be reused after release
+  filters: set null, ownership transfer
+  tags: use-after-free, memory-safety
+  description: Frees memory and requires follow-up ownership/lifetime validation.
+  recommendation: Clear freed pointers and avoid reuse after ownership release.
+- rule_id: C_RULE_010
+  cwe: CWE-134
+  owasp: A03:2021-Injection
+  name: Format string sink
+  severity: high
+  sink_pattern: printf
+  source_types: argv, stdin, file, network, environment, parameter
+  sink_types: format_string
+  preconditions: format string may be externally controlled
+  filters: constant format string
+  tags: format-string, injection
+  description: Uses formatted output where the format string may be attacker-controlled.
+  recommendation: Use a constant format string and pass untrusted data as arguments.
