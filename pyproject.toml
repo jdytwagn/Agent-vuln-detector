@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-vuln-detector"
+version = "0.1.0"
+description = "Agent-based C/C++ vulnerability detection platform"
+requires-python = ">=3.10"
+dependencies = ["fastapi", "uvicorn", "python-multipart", "pydantic", "tree-sitter", "tree-sitter-cpp"]
+
+[project.optional-dependencies]
+model = ["transformers", "torch", "safetensors", "huggingface-hub>=0.34.0,<1.0"]
+test = ["pytest"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+include = ["agents*", "backend*", "core*", "evaluation*", "models*", "reports*", "rules*"]
+exclude = ["frontend*", "storage*", "out*", "tests*"]

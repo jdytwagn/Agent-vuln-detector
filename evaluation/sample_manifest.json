@@ -1,0 +1,29 @@
+{
+  "dataset": "Local Demo Subset",
+  "samples": [
+    {
+      "sample_id": "vulnerable_single_file",
+      "path": "../tests/samples/vulnerable.c",
+      "label": 1,
+      "loc": 16,
+      "cross_file": false,
+      "exploitable": true
+    },
+    {
+      "sample_id": "mitigated_single_file",
+      "path": "../tests/samples/mitigated.c",
+      "label": 0,
+      "loc": 13,
+      "cross_file": false,
+      "non_exploitable": true
+    },
+    {
+      "sample_id": "cross_file_project",
+      "path": "../tests/samples",
+      "label": 1,
+      "loc": 45,
+      "cross_file": true,
+      "exploitable": true
+    }
+  ]
+}
