@@ -1,9 +1,4 @@
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
-const API_KEY = import.meta.env.VITE_API_KEY ?? "";
-
-function authHeaders(): Record<string, string> {
-  return API_KEY ? { "X-API-Key": API_KEY } : {};
-}
 
 export type ScanTask = {
   id: string;
@@ -74,8 +69,8 @@ export type EvaluationTask = {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...authHeaders(), ...(init?.headers ?? {}) },
-    ...init
+    ...init,
+    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) }
   });
   if (!response.ok) {
     throw new Error(await response.text());
@@ -97,7 +92,7 @@ export const api = {
     if (model_path) form.append("model_path", model_path);
     form.append("enable_llm_semantics", String(enable_llm_semantics));
     form.append("strict_model", String(strict_model));
-    const response = await fetch(`${API_BASE}/api/scans/upload`, { method: "POST", headers: authHeaders(), body: form });
+    const response = await fetch(`${API_BASE}/api/scans/upload`, { method: "POST", body: form });
     if (!response.ok) throw new Error(await response.text());
     return response.json() as Promise<ScanTask>;
   },
@@ -133,7 +128,7 @@ export const api = {
     })
   ,
   downloadReport: async (id: string, format: "json" | "md") => {
-    const response = await fetch(`${API_BASE}/api/scans/${id}/report?format=${format}`, { headers: authHeaders() });
+    const response = await fetch(`${API_BASE}/api/scans/${id}/report?format=${format}`);
     if (!response.ok) throw new Error(await response.text());
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);

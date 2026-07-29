@@ -52,15 +52,14 @@ AGENT_DETECTOR_API_KEY=replace_with_a_strong_random_value
 开启后：
 
 - API 请求需要 `X-API-Key` 请求头，或 `Authorization: Bearer <key>`。
-- 前端需要在构建时设置 `VITE_API_KEY`，否则无法访问受保护 API。
+- Docker 前端由 Nginx、开发模式由 Vite 代理在服务端注入 `AGENT_DETECTOR_API_KEY`，密钥不会编译进浏览器 JavaScript；两种模式都读取项目根目录 `.env`。
 
-Docker Compose 中可以把前端构建参数改为：
+Docker Compose 中前端使用相同的运行时环境变量：
 
 ```yaml
 frontend:
-  build:
-    args:
-      VITE_API_KEY: "replace_with_a_strong_random_value"
+  environment:
+    AGENT_DETECTOR_API_KEY: "replace_with_a_strong_random_value"
 ```
 
 ## 资源限制

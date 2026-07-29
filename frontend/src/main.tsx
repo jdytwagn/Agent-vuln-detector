@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Activity, FileCode2, FlaskConical, ListChecks, PlayCircle, RefreshCw, ShieldAlert, Upload } from "lucide-react";
 import { api, EvaluationTask, Finding, Rule, ScanTask } from "./api/client";
@@ -20,6 +20,7 @@ function App() {
   const [rules, setRules] = useState<Rule[]>([]);
   const [evaluations, setEvaluations] = useState<EvaluationTask[]>([]);
   const [selectedScanId, setSelectedScanId] = useState<string>("");
+  const selectedScanIdRef = useRef<string>("");
   const [findings, setFindings] = useState<Finding[]>([]);
   const [sourcePath, setSourcePath] = useState("tests/samples");
   const [manifestPath, setManifestPath] = useState("evaluation/sample_manifest.json");
@@ -33,23 +34,42 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
-  const refresh = async (preferredScanId?: string) => {
+  const selectScan = useCallback((id: string) => {
+    selectedScanIdRef.current = id;
+    setSelectedScanId(id);
+  }, []);
+
+  const refresh = useCallback(async (preferredScanId?: string) => {
     const [scanData, ruleData, evaluationData] = await Promise.all([api.listScans(), api.rules(), api.listEvaluations()]);
     setScans(scanData);
     setRules(ruleData);
     setEvaluations(evaluationData);
-    const activeScan = preferredScanId || selectedScanId || scanData[0]?.id || "";
+    const requestedScan = preferredScanId || selectedScanIdRef.current;
+    const activeScan = scanData.some((scan) => scan.id === requestedScan) ? requestedScan : scanData[0]?.id || "";
+    selectedScanIdRef.current = activeScan;
     setSelectedScanId(activeScan);
     if (activeScan) {
       setFindings(await api.findings(activeScan));
     }
-  };
+  }, []);
 
   useEffect(() => {
-    refresh().catch((error) => setMessage(error.message));
-    const timer = window.setInterval(() => refresh().catch(() => undefined), 3000);
-    return () => window.clearInterval(timer);
-  }, []);
+    let cancelled = false;
+    let timer: number | undefined;
+    const poll = async () => {
+      try {
+        await refresh();
+      } catch (error) {
+        if (!cancelled) setMessage(error instanceof Error ? error.message : "刷新失败");
+      }
+      if (!cancelled) timer = window.setTimeout(poll, 3000);
+    };
+    void poll();
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [refresh]);
 
   useEffect(() => {
     if (selectedScanId) {
@@ -80,7 +100,7 @@ function App() {
     setBusy(true);
     try {
       const task = await api.createScan(targetPath, modelBackend, effectiveModelPath, enableLlm, strictModel);
-      setSelectedScanId(task.id);
+      selectScan(task.id);
       setTab("findings");
       setMessage(`${successMessage}：${task.id}`);
       await refresh(task.id);
@@ -97,7 +117,7 @@ function App() {
     setBusy(true);
     try {
       const task = await api.uploadScan(file, modelBackend, effectiveModelPath, enableLlm, strictModel);
-      setSelectedScanId(task.id);
+      selectScan(task.id);
       setTab("findings");
       setMessage(`已上传并提交扫描：${file.name}`);
       await refresh(task.id);
@@ -167,7 +187,7 @@ function App() {
             <MetricCard label="误报过滤" value={dashboard.filtered} tone="warning" />
             <section className="panel wide">
               <h2>任务概览</h2>
-              <TaskTable scans={scans} selectedScanId={selectedScanId} onSelect={setSelectedScanId} />
+              <TaskTable scans={scans} selectedScanId={selectedScanId} onSelect={selectScan} />
             </section>
             <section className="panel">
               <h2>严重等级分布</h2>
@@ -236,7 +256,7 @@ function App() {
           <section className="content-grid">
             <section className="panel">
               <h2>扫描任务</h2>
-              <TaskTable scans={scans} selectedScanId={selectedScanId} onSelect={setSelectedScanId} />
+              <TaskTable scans={scans} selectedScanId={selectedScanId} onSelect={selectScan} />
             </section>
             <section className="panel wide">
               <h2>漏洞详情</h2>

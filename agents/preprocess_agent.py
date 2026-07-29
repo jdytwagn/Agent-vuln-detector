@@ -44,18 +44,23 @@ class PreprocessAgent:
     def run(self, files: list[SourceFile]) -> CodebaseIR:
         functions: list[FunctionInfo] = []
         call_sites: list[CallSite] = []
+        tree_sitter_used = False
         for source in files:
-            file_functions = self._extract_functions(source)
+            parsed = self._tree_sitter_structure(source) if self.parser_backend == "tree-sitter" else None
+            if parsed is not None:
+                file_functions, file_calls = parsed
+                tree_sitter_used = True
+            else:
+                file_functions = self._extract_functions(source)
+                file_calls = self._extract_calls(source, file_functions)
             functions.extend(file_functions)
-            call_sites.extend(self._extract_calls(source, file_functions))
+            call_sites.extend(file_calls)
         ast_nodes = self._build_ast_summary(functions)
-        parser_backend = self.parser_backend
-        if self.parser_backend == "tree-sitter":
+        parser_backend = "tree-sitter" if tree_sitter_used else "lightweight"
+        if tree_sitter_used:
             tree_nodes = self._tree_sitter_ast_nodes(files)
             if tree_nodes:
                 ast_nodes.extend(tree_nodes)
-            else:
-                parser_backend = "lightweight"
         call_edges = self._build_call_edges(functions, call_sites)
         variable_refs = self._extract_variable_refs(functions)
         source_sink_nodes = self._extract_source_sink_nodes(call_sites)
@@ -112,7 +117,9 @@ class PreprocessAgent:
 
     def _extract_calls(self, source: SourceFile, functions: list[FunctionInfo]) -> list[CallSite]:
         calls: list[CallSite] = []
-        for line_number, line in enumerate(source.lines, start=1):
+        analysis_lines = self._strip_comments(source.content).splitlines()
+        for line_number, line in enumerate(analysis_lines, start=1):
+            original_line = source.lines[line_number - 1]
             if self._looks_like_function_signature(line):
                 continue
             function_name = self._function_at_line(functions, source.path, line_number)
@@ -128,11 +135,165 @@ class PreprocessAgent:
                         callee=callee,
                         file_path=source.path,
                         line=line_number,
-                        code=line.strip(),
-                        arguments=self._split_arguments(match.group("args")),
+                        code=original_line.strip(),
+                        arguments=self._split_arguments(original_line[match.start("args") : match.end("args")]),
                     )
                 )
         return calls
+
+    def _tree_sitter_structure(self, source: SourceFile) -> tuple[list[FunctionInfo], list[CallSite]] | None:
+        parser = self._tree_sitter_parser()
+        if parser is None:
+            return None
+        encoded = source.content.encode("utf-8", errors="ignore")
+        tree = parser.parse(encoded)
+        functions: list[FunctionInfo] = []
+        call_nodes: list[object] = []
+        stack = [tree.root_node]
+        while stack:
+            node = stack.pop()
+            if node.type == "function_definition":
+                declarator = node.child_by_field_name("declarator")
+                name_node = self._declarator_name_node(declarator)
+                if name_node is not None:
+                    name = self._node_text(encoded, name_node).split("::")[-1]
+                    function_declarator = self._find_descendant(declarator, "function_declarator")
+                    parameter_list = (
+                        function_declarator.child_by_field_name("parameters") if function_declarator is not None else None
+                    )
+                    parameters: list[str] = []
+                    if parameter_list is not None:
+                        for parameter in parameter_list.named_children:
+                            if parameter.type not in {"parameter_declaration", "optional_parameter_declaration"}:
+                                continue
+                            parameter_name = self._declarator_name_node(parameter.child_by_field_name("declarator"))
+                            if parameter_name is not None:
+                                parameters.append(self._node_text(encoded, parameter_name).split("::")[-1])
+                    type_node = node.child_by_field_name("type")
+                    return_type = self._node_text(encoded, type_node).strip() if type_node is not None else "unknown"
+                    functions.append(
+                        FunctionInfo(
+                            name=name,
+                            file_path=source.path,
+                            start_line=node.start_point[0] + 1,
+                            end_line=node.end_point[0] + 1,
+                            code=self._node_text(encoded, node),
+                            parameters=parameters,
+                            return_type=return_type or "unknown",
+                        )
+                    )
+            elif node.type == "call_expression":
+                call_nodes.append(node)
+            stack.extend(reversed(node.children))
+
+        calls: list[CallSite] = []
+        for node in call_nodes:
+            function_node = node.child_by_field_name("function")
+            arguments_node = node.child_by_field_name("arguments")
+            if function_node is None or arguments_node is None:
+                continue
+            callee_text = self._node_text(encoded, function_node).strip()
+            callee_match = re.search(r"([A-Za-z_]\w*)\s*$", callee_text)
+            if not callee_match:
+                continue
+            callee = callee_match.group(1)
+            if callee in CONTROL_WORDS:
+                continue
+            line_number = node.start_point[0] + 1
+            function_name = self._function_at_line(functions, source.path, line_number) or "<global>"
+            arguments = [self._node_text(encoded, child).strip() for child in arguments_node.named_children]
+            code = source.lines[line_number - 1].strip() if line_number <= len(source.lines) else self._node_text(encoded, node)
+            calls.append(CallSite(function_name, callee, source.path, line_number, code, arguments))
+
+        for function in functions:
+            function.calls = sorted(
+                {call.callee for call in calls if call.function_name == function.name and call.file_path == function.file_path}
+            )
+        return functions, calls
+
+    def _tree_sitter_parser(self):
+        try:
+            from tree_sitter import Language, Parser
+            import tree_sitter_cpp
+
+            return Parser(Language(tree_sitter_cpp.language()))
+        except Exception:
+            return None
+
+    def _declarator_name_node(self, node):
+        if node is None:
+            return None
+        if node.type in {"identifier", "field_identifier", "operator_name", "destructor_name", "type_identifier"}:
+            return node
+        named = node.child_by_field_name("declarator") or node.child_by_field_name("name")
+        if named is not None and named != node:
+            found = self._declarator_name_node(named)
+            if found is not None:
+                return found
+        for child in node.named_children:
+            found = self._declarator_name_node(child)
+            if found is not None:
+                return found
+        return None
+
+    def _find_descendant(self, node, kind: str):
+        if node is None:
+            return None
+        if node.type == kind:
+            return node
+        for child in node.named_children:
+            found = self._find_descendant(child, kind)
+            if found is not None:
+                return found
+        return None
+
+    def _node_text(self, encoded: bytes, node) -> str:
+        return encoded[node.start_byte : node.end_byte].decode("utf-8", errors="ignore")
+
+    def _strip_comments(self, text: str) -> str:
+        output: list[str] = []
+        index = 0
+        in_block = False
+        in_string: str | None = None
+        escaped = False
+        while index < len(text):
+            char = text[index]
+            following = text[index + 1] if index + 1 < len(text) else ""
+            if in_block:
+                if char == "*" and following == "/":
+                    output.extend((" ", " "))
+                    index += 2
+                    in_block = False
+                else:
+                    output.append("\n" if char == "\n" else " ")
+                    index += 1
+                continue
+            if in_string:
+                output.append(char)
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == in_string:
+                    in_string = None
+                index += 1
+                continue
+            if char in {'"', "'"}:
+                in_string = char
+                output.append(char)
+                index += 1
+            elif char == "/" and following == "*":
+                output.extend((" ", " "))
+                index += 2
+                in_block = True
+            elif char == "/" and following == "/":
+                while index < len(text) and text[index] != "\n":
+                    output.append(" ")
+                    index += 1
+            else:
+                output.append(char)
+                index += 1
+        return "".join(output)
 
     def _function_at_line(self, functions: list[FunctionInfo], file_path: str, line: int) -> str | None:
         for function in functions:
@@ -249,12 +410,8 @@ class PreprocessAgent:
         return nodes
 
     def _tree_sitter_ast_nodes(self, files: list[SourceFile]) -> list[AstNode]:
-        try:
-            from tree_sitter import Language, Parser
-            import tree_sitter_cpp
-
-            parser = Parser(Language(tree_sitter_cpp.language()))
-        except Exception:
+        parser = self._tree_sitter_parser()
+        if parser is None:
             return []
 
         interesting = {"function_definition", "call_expression", "declaration", "assignment_expression", "if_statement"}

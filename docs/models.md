@@ -45,6 +45,8 @@ python -m pip install "huggingface-hub>=0.34.0,<1.0"
 
 正式实验建议加 `--strict-model`。开启后如果模型路径、依赖或权重加载失败，系统会直接报错；不开启时系统保留 mock fallback，适合课堂演示和离线联调。
 
+模型的 `config.json` 应使用 `vulnerable/safe` 等有语义的 `id2label`。如果模型只提供 `LABEL_0/LABEL_1`，需要在 `.env` 中显式设置正类，例如 `AGENT_DETECTOR_MODEL_POSITIVE_LABEL=LABEL_1`，避免标签方向被错误反转。
+
 CodeBERT：
 
 ```powershell

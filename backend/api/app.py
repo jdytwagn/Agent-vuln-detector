@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 import json
+import zipfile
 from pathlib import Path
 
 from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from starlette.concurrency import run_in_threadpool
 
-from backend.api.schemas import DatasetPrepareCreate, EvaluationCreate, ScanCreate
-from backend.api.security import require_api_key
+from backend.api.schemas import DatasetPrepareCreate, EvaluationCreate, ModelBackend, ScanCreate
+from backend.api.security import require_api_key, resolve_api_path
 from backend.services.evaluation_service import EvaluationService
 from backend.services.scan_service import ScanService
 from backend.storage.repository import TaskRepository
+from core.config import ScanConfig
 from core.env import get_env
 from evaluation.adapters import prepare_dataset
 from rules.rule_loader import load_rules
@@ -64,7 +67,7 @@ def create_scan(payload: ScanCreate, background_tasks: BackgroundTasks) -> dict:
     background_tasks.add_task(
         scan_service.run_scan,
         task["id"],
-        payload.source_path,
+        task["source_path"],
         payload.model_backend,
         payload.model_path,
         payload.strict_model,
@@ -81,17 +84,21 @@ def create_scan(payload: ScanCreate, background_tasks: BackgroundTasks) -> dict:
 async def upload_scan(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    model_backend: str = Form("mock"),
+    model_backend: ModelBackend = Form("mock"),
     model_path: str | None = Form(None),
     strict_model: bool = Form(False),
     agent_chain: str | None = Form(None),
     enable_llm_semantics: bool = Form(False),
 ) -> dict:
-    content = await file.read()
     task = scan_service.create_path_scan(file.filename or "upload", model_backend, validate_path=False)
     try:
-        source_path = scan_service.prepare_upload(task["id"], file.filename or "upload.zip", content)
-    except ValueError as exc:
+        source_path = await run_in_threadpool(
+            scan_service.prepare_upload_stream,
+            task["id"],
+            file.filename or "upload.zip",
+            file.file,
+        )
+    except (ValueError, OSError, zipfile.BadZipFile) as exc:
         repository.update_scan(task["id"], status="failed", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     chain = tuple(part.strip() for part in agent_chain.split(",") if part.strip()) if agent_chain else None
@@ -132,20 +139,24 @@ def download_report(scan_id: str, format: str = "json") -> FileResponse:
 
 @app.get("/api/rules", dependencies=[Depends(require_api_key)])
 def get_rules() -> list[dict]:
-    return [rule.__dict__ for rule in load_rules("rules/cwe_rules.yaml")]
+    return [rule.__dict__ for rule in load_rules(ScanConfig().rules_path)]
 
 
 @app.post("/api/datasets/prepare", dependencies=[Depends(require_api_key)])
 def prepare_dataset_manifest(payload: DatasetPrepareCreate) -> dict:
     try:
+        input_path = resolve_api_path(payload.input_path, must_exist=True)
+        dataset_root = Path("storage/datasets").resolve()
+        output_path = resolve_api_path(payload.output_path, workspace_root=dataset_root)
+        materialize_dir = resolve_api_path(payload.materialize_dir, workspace_root=dataset_root)
         return prepare_dataset(
             dataset_type=payload.dataset_type,
-            input_path=payload.input_path,
-            output_path=payload.output_path,
-            materialize_dir=payload.materialize_dir,
+            input_path=str(input_path),
+            output_path=str(output_path),
+            materialize_dir=str(materialize_dir),
             limit=payload.limit,
         )
-    except ValueError as exc:
+    except (ValueError, OSError, json.JSONDecodeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 

@@ -23,6 +23,8 @@ python main.py evaluate evaluation/sample_manifest.json --output out/evaluation_
 
 对于 `codebert` 和 `graphcodebert`，baseline 会直接读取 manifest 中每个样本的源码文本并让模型打分，不依赖规则智能体先命中候选漏洞点。这用于对齐文档中的 CodeBERT / GraphCodeBERT 分类基线。
 
+未显式传入阈值时，系统会按固定随机种子进行分层拆分：只在 calibration 子集选择阈值，并在不重叠的 evaluation 子集报告指标；样本过少、无法安全拆分时使用固定阈值 `0.5`，不会在测试标签上调参。
+
 CodeBERT / GraphCodeBERT 模型 baseline：
 
 ```powershell
