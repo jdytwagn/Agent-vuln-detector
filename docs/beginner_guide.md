@@ -45,9 +45,9 @@ flowchart TD
   B --> C["检测引擎 Pipeline"]
   C --> D["预处理智能体"]
   D --> E["规则推理智能体"]
-  E --> F["深度学习打分智能体"]
-  F --> G["数据流分析智能体"]
-  G --> H["语义推理智能体"]
+  E --> G["数据流分析智能体"]
+  G --> F["深度学习打分智能体"]
+  F --> H["语义推理智能体"]
   H --> I["可利用性验证智能体"]
   I --> J["融合决策智能体"]
   J --> K["JSON / Markdown 报告"]
@@ -100,8 +100,8 @@ agent-vuln-detector/
 | --- | --- | --- | --- | --- |
 | 预处理智能体 | `agents/preprocess_agent.py` | C/C++ 文件 | 统一代码中间表示 IR | 提取函数、调用点、变量引用、AST 摘要、CFG/DFG 信息 |
 | 规则推理智能体 | `agents/rule_agent.py` | IR + 规则库 | 候选漏洞 | 根据 `strcpy`、`system`、`fopen` 等危险 API 找可疑点 |
-| 模型打分智能体 | `agents/model_score_agent.py` | 候选漏洞 | 模型分数 | 使用 mock、CodeBERT 或 GraphCodeBERT 给候选片段打分 |
 | 数据流分析智能体 | `agents/dataflow_agent.py` | IR + 候选漏洞 | source-to-sink 路径 | 判断外部输入是否能传到危险函数 |
+| 模型打分智能体 | `agents/model_score_agent.py` | 候选漏洞 + 数据流特征 | 模型分数 | 使用 mock、CodeBERT 或 GraphCodeBERT 给候选片段打分 |
 | 语义推理智能体 | `agents/semantic_agent.py` | 规则、模型、数据流证据 | 中文解释 | 解释为什么这个位置危险 |
 | 可利用性验证智能体 | `agents/exploitability_agent.py` | 候选漏洞和上下文 | 可利用性结论 | 判断是否可控、可达、是否有过滤或长度检查 |
 | 融合决策智能体 | `agents/fusion_agent.py` | 所有证据 | 最终置信度和风险等级 | 综合各智能体结果，输出最终报告结论 |
@@ -233,13 +233,13 @@ python main.py scan tests/samples --enable-llm-semantics --output out/llm_report
 默认智能体链就是文档中的完整流程：
 
 ```text
-preprocess,rule_reasoning,model_scoring,dataflow_analysis,semantic_reasoning,exploitability_validation,fusion_decision
+preprocess,rule_reasoning,dataflow_analysis,model_scoring,semantic_reasoning,exploitability_validation,fusion_decision
 ```
 
 你可以用 `--agent-chain` 显式指定它：
 
 ```powershell
-python main.py scan tests/samples --agent-chain preprocess,rule_reasoning,model_scoring,dataflow_analysis,semantic_reasoning,exploitability_validation,fusion_decision --output out/report.json
+python main.py scan tests/samples --agent-chain preprocess,rule_reasoning,dataflow_analysis,model_scoring,semantic_reasoning,exploitability_validation,fusion_decision --output out/report.json
 ```
 
 如果你想做消融实验，例如先关闭模型、数据流、语义和可利用性，只看规则和融合，可以运行：
@@ -378,7 +378,7 @@ AGENT_DETECTOR_CORS_ORIGINS=http://127.0.0.1:5173,http://localhost:5173
 AGENT_DETECTOR_API_KEY=
 ```
 
-`AGENT_DETECTOR_API_KEY` 默认可以为空。为空时，本地演示不需要鉴权。如果填写了值，前端也要配置 `VITE_API_KEY` 才能访问 API。
+`AGENT_DETECTOR_API_KEY` 默认可以为空。为空时，本地演示不需要鉴权。Docker 模式由 Nginx、开发模式由 Vite 代理安全地注入请求头，密钥不会进入浏览器 JavaScript。
 
 ## 十六、当前规则库覆盖什么
 

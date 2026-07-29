@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.api.app import app
+from backend.api.security import resolve_api_path
 from backend.services.evaluation_service import EvaluationService
 from backend.services.scan_service import ScanService
 from backend.storage.repository import TaskRepository
@@ -76,3 +77,24 @@ def test_repository_records_schema_version(tmp_path: Path) -> None:
     assert info["schema_version"] >= 2
     assert "scans" in info["tables"]
     assert "evaluations" in info["tables"]
+
+
+def test_dataset_api_paths_are_restricted_to_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("AGENT_DETECTOR_ALLOW_ANY_PATH", raising=False)
+
+    with pytest.raises(ValueError):
+        resolve_api_path(str(tmp_path / "outside.json"))
+
+    workspace_file = Path.cwd() / "evaluation" / "sample_manifest.json"
+    with pytest.raises(ValueError):
+        resolve_api_path(str(workspace_file), workspace_root=Path.cwd() / "storage" / "datasets")
+
+
+def test_streaming_upload_rejects_limit_without_retaining_file(tmp_path: Path) -> None:
+    service = _service(tmp_path)
+    service.MAX_UPLOAD_BYTES = 8
+
+    with pytest.raises(ValueError):
+        service.prepare_upload("task-stream", "large.c", b"0123456789")
+
+    assert not (tmp_path / "storage" / "uploads" / "task-stream" / "large.c").exists()

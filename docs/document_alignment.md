@@ -11,7 +11,7 @@
 | 文档要求 | 当前实现 | 状态 | 代码位置 | 说明 |
 | --- | --- | --- | --- | --- |
 | 源码输入 | CLI、API、Web 路径扫描和上传扫描 | 已对齐 | `main.py`、`backend/api/app.py`、`frontend/src/main.tsx` | 支持单文件、目录、上传文件或 zip |
-| 代码预处理 | 预处理智能体输出函数、调用点、调用边、变量引用、AST 摘要、CFG/DFG 统计 | 部分对齐 | `agents/preprocess_agent.py` | 当前是 Tree-sitter AST 摘要 + 轻量函数/调用/DFG 提取，尚不是 Clang/LLVM 级精确分析 |
+| 代码预处理 | 预处理智能体输出函数、调用点、调用边、变量引用、AST 摘要、CFG/DFG 统计 | 部分对齐 | `agents/preprocess_agent.py` | 当前使用 Tree-sitter 提取函数、参数和调用，并构建轻量 CFG/DFG；尚不是 Clang/LLVM 级精确分析 |
 | 规则初筛 | CWE/OWASP 规则库和规则智能体 | 已对齐 | `rules/cwe_rules.yaml`、`agents/rule_agent.py` | 当前主要基于 sink 命中，规则条件仍可继续增强 |
 | 深度学习打分 | mock、CodeBERT、GraphCodeBERT 模型接口 | 已对齐 | `models/` | 本机已缓存 Devign 微调模型；正式实验可开启严格模型模式避免 fallback |
 | 数据流验证 | source-to-sink 追踪，支持函数内、跨函数、跨文件路径 | 部分对齐 | `agents/dataflow_agent.py` | 已修复函数签名误判和同名函数覆盖；别名、指针、结构体仍待增强 |
@@ -40,8 +40,8 @@
 | CodeBERT baseline | 纯模型 baseline 直接对样本代码打分 | 已对齐 | `evaluation/model_baselines.py` |
 | GraphCodeBERT baseline | 纯模型 baseline 直接对样本代码打分 | 已对齐 | `evaluation/model_baselines.py` |
 | GNN baseline | 可训练轻量 GCN baseline + 图特征 baseline | 部分对齐 | `evaluation/gnn_baseline.py` 已能训练和输出指标；若要论文复现级别，还需 Devign/Joern 风格 CPG |
-| 阈值校准 | 自动选择 F1 最优阈值 | 已对齐 | `evaluation/calibration.py` |
-| 模型输入格式 | 代码文本 + CWE 上下文，统一 `max_length=512` 截断 | 已对齐 | 后续可进一步固定 train/validation/test 切分 |
+| 阈值校准 | 在独立 calibration 子集选择 F1 最优阈值，并在不重叠 evaluation 子集报告指标 | 已对齐 | `evaluation/calibration.py`、`evaluation/model_baselines.py` |
+| 模型输入格式 | 代码文本 + CWE 上下文，统一 `max_length=512` 截断 | 已对齐 | 正式论文实验仍应按项目或 commit 固定训练、验证和测试划分 |
 
 ## 四、数据集对齐
 

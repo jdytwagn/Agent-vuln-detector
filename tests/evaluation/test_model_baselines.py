@@ -41,3 +41,23 @@ def test_model_baseline_scores_whole_sample_without_rule_pipeline(tmp_path: Path
     assert result["metrics"]["auc"] == 1.0
     assert result["metrics"]["f1"] == 1.0
     assert result["metrics"]["alerts_per_kloc"] == 500.0
+
+
+def test_automatic_threshold_uses_disjoint_calibration_and_evaluation_sets(tmp_path: Path) -> None:
+    samples = []
+    for index, vulnerable in enumerate((True, True, False, False)):
+        source = tmp_path / f"sample_{index}.c"
+        source.write_text("strcpy(dst, src);" if vulnerable else "return;", encoding="utf-8")
+        samples.append({"sample_id": str(index), "path": str(source), "label": int(vulnerable), "loc": 1})
+    manifest = tmp_path / "split_manifest.json"
+    manifest.write_text(json.dumps({"dataset": "split", "samples": samples}), encoding="utf-8")
+
+    evaluator = ModelBaselineEvaluator.__new__(ModelBaselineEvaluator)
+    evaluator.model_backend = "fake"
+    evaluator.scorer = FakeTextScorer()
+    evaluator.seed = 7
+    result = evaluator.evaluate(str(manifest))
+
+    assert result["split"]["calibration_samples"] == 2
+    assert result["split"]["evaluation_samples"] == 2
+    assert result["split"]["overlap_samples"] == 0

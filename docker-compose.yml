@@ -10,7 +10,7 @@ services:
       AGENT_DETECTOR_API_KEY: "${AGENT_DETECTOR_API_KEY:-}"
       AGENT_DETECTOR_CORS_ORIGINS: "http://127.0.0.1:5173,http://localhost:5173"
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./storage:/app/storage
     healthcheck:
@@ -25,9 +25,11 @@ services:
       dockerfile: Dockerfile.frontend
       args:
         VITE_API_BASE: ""
-        VITE_API_KEY: ""
+    environment:
+      AGENT_DETECTOR_API_KEY: "${AGENT_DETECTOR_API_KEY:-}"
+      NGINX_ENVSUBST_FILTER: "AGENT_DETECTOR_API_KEY"
     depends_on:
       backend:
         condition: service_healthy
     ports:
-      - "5173:80"
+      - "127.0.0.1:5173:80"

@@ -92,11 +92,24 @@ class VulnerabilityDetectionPipeline:
                 "agents": executed_agents,
                 "model_backend": self.config.model_backend,
                 "model_name": self.config.model_name,
+                **self._model_runtime_metadata(),
                 "strict_model": self.config.strict_model,
                 "llm_semantics": self.config.enable_llm_semantics,
                 "rules_path": self.config.rules_path,
             },
         )
+
+    def _model_runtime_metadata(self) -> dict[str, object]:
+        if self.model_score_agent is None:
+            return {"model_available": False, "model_fallback": False, "model_load_error": None}
+        scorer = self.model_score_agent.scorer
+        available = getattr(scorer, "available", True)
+        fallback = self.config.model_backend != "mock" and not available
+        return {
+            "model_available": bool(available),
+            "model_fallback": fallback,
+            "model_load_error": getattr(scorer, "load_error", None),
+        }
 
     def _validate_agent_chain(self, agent_chain: tuple[str, ...]) -> None:
         unknown = [name for name in agent_chain if name not in self.REQUIRED_ORDER]
