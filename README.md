@@ -27,8 +27,8 @@
 源码输入
   -> 代码预处理
   -> 规则初筛
-  -> 深度学习打分
   -> 数据流验证
+  -> 深度学习打分
   -> 语义推理
   -> 可利用性判断
   -> 融合决策
@@ -41,8 +41,8 @@
 | --- | --- | --- |
 | 预处理智能体 | 提取函数、调用点、AST 摘要、调用边、变量引用、source/sink 节点 | `agents/preprocess_agent.py` |
 | 规则推理智能体 | 基于 CWE/OWASP 规则发现候选漏洞 | `agents/rule_agent.py` |
-| 深度学习打分智能体 | 对候选漏洞代码片段输出概率分数 | `agents/model_score_agent.py` |
 | 数据流分析智能体 | 追踪 source-to-sink 路径 | `agents/dataflow_agent.py` |
+| 深度学习打分智能体 | 结合代码片段和数据流特征输出概率分数 | `agents/model_score_agent.py` |
 | 语义推理智能体 | 生成中文漏洞解释 | `agents/semantic_agent.py` |
 | 可利用性验证智能体 | 判断输入可控性、路径可达性和缓解逻辑 | `agents/exploitability_agent.py` |
 | 融合决策智能体 | 综合多源证据输出最终置信度和风险等级 | `agents/fusion_agent.py` |
@@ -82,7 +82,7 @@ agent-vuln-detector/
 
 Python 基础依赖见 [pyproject.toml](pyproject.toml)，前端依赖见 [frontend/package.json](frontend/package.json)。
 
-## 快速开始
+## 五分钟快速开始
 
 ### 1. 克隆项目
 
@@ -91,25 +91,45 @@ git clone https://github.com/jdytwagn/agent-vuln-detector.git
 cd agent-vuln-detector
 ```
 
-### 2. 安装 Python 依赖
+### 2. 创建虚拟环境并安装 Python 依赖
 
-基础运行和测试：
+Windows PowerShell：
 
 ```powershell
-python -m pip install -e .[test]
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e ".[test]"
 ```
 
-如果要运行 CodeBERT、GraphCodeBERT 或 GNN baseline：
+Linux / macOS：
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[test]"
+```
+
+基础安装已经可以运行完整规则、Tree-sitter、数据流、报告、CLI 和 Web 后端，不要求模型权重或 API Key。
+
+如果要运行 CodeBERT、GraphCodeBERT 或 GNN baseline，再安装模型依赖：
 
 ```powershell
-python -m pip install -e .[model,test]
+python -m pip install -e ".[model,test]"
+```
+
+验证安装：
+
+```powershell
+python main.py scan tests/samples --output out/report.json --markdown out/report.md
 ```
 
 ### 3. 安装前端依赖
 
 ```powershell
 cd frontend
-npm install
+npm ci
 cd ..
 ```
 
@@ -119,6 +139,17 @@ cd ..
 
 ```powershell
 .\scripts\start_all.ps1
+```
+
+Linux / macOS 请分别启动两个终端：
+
+```bash
+python -m backend.run
+```
+
+```bash
+cd frontend
+npm run dev
 ```
 
 也可以分开启动：
@@ -182,7 +213,7 @@ python main.py scan D:\your_cpp_project --output out/your_report.json --markdown
 使用完整智能体链：
 
 ```powershell
-python main.py scan tests/samples --agent-chain preprocess,rule_reasoning,model_scoring,dataflow_analysis,semantic_reasoning,exploitability_validation,fusion_decision --output out/full_chain_report.json
+python main.py scan tests/samples --agent-chain preprocess,rule_reasoning,dataflow_analysis,model_scoring,semantic_reasoning,exploitability_validation,fusion_decision --output out/full_chain_report.json
 ```
 
 只跑规则和融合，用于消融实验：
@@ -215,6 +246,7 @@ python main.py scan tests/samples --model-backend graphcodebert --model-path sto
 
 - `--strict-model` 用于正式实验。开启后，如果真实模型加载失败，系统会直接报错。
 - 不开启 `--strict-model` 时，模型不可用会降级为 mock scorer，适合演示和离线联调。
+- 如果模型的 `id2label` 只有 `LABEL_0/LABEL_1` 而没有明确语义，请在 `.env` 中设置 `AGENT_DETECTOR_MODEL_POSITIVE_LABEL`，例如 `LABEL_1`；系统不会再盲猜正类方向。
 
 ## 后端 API
 
@@ -285,9 +317,10 @@ copy .env.example .env
 常用环境变量：
 
 ```env
-DEEPSEEK_API_KEY=你的新key
+DEEPSEEK_API_KEY=
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-v4-flash
+AGENT_DETECTOR_MODEL_POSITIVE_LABEL=
 AGENT_DETECTOR_CORS_ORIGINS=http://127.0.0.1:5173,http://localhost:5173
 AGENT_DETECTOR_API_KEY=
 AGENT_DETECTOR_DB_PATH=storage/app.db
@@ -295,9 +328,21 @@ AGENT_DETECTOR_DB_PATH=storage/app.db
 
 说明：
 
-- `DEEPSEEK_API_KEY`：启用 LLM 语义推理时使用。
+- `DEEPSEEK_API_KEY`：可选。填写后配合 `--enable-llm-semantics` 启用 DeepSeek 语义解释；不填写时使用本地模板解释。
+- `DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`：模型服务地址和模型名，应以你的服务商控制台为准。
+- `AGENT_DETECTOR_MODEL_POSITIVE_LABEL`：仅当本地分类模型使用含糊的 `LABEL_0/LABEL_1` 时填写，例如 `LABEL_1`。
 - `AGENT_DETECTOR_API_KEY`：可选 API Key。设置后，除健康检查外的 API 需要 `X-API-Key` 或 `Authorization: Bearer <key>`。
 - `AGENT_DETECTOR_ALLOW_ANY_PATH=true`：允许 API 扫描工作区外路径。仅建议在可信本地环境使用。
+
+### 三种运行模式
+
+| 模式 | 需要配置 | 适用场景 |
+| --- | --- | --- |
+| 默认本地模式 | 无需 API、无需模型权重 | 首次运行、规则和数据流扫描、功能演示 |
+| LLM 语义模式 | `DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL` | 生成更丰富的中文漏洞解释 |
+| 真实代码模型模式 | 安装 `.[model]` 并提供本地目录或 Hugging Face 模型 ID | CodeBERT/GraphCodeBERT 正式实验 |
+
+模型权重、原始数据集和 `.env` 不会提交到 Git。用户拉取项目后只需安装依赖；如果需要 LLM 或真实代码模型，再按上述变量和命令配置即可。
 
 ## 规则库
 
@@ -418,7 +463,7 @@ git grep "TOKEN"
 
 ## 当前限制
 
-- 当前预处理是 Tree-sitter AST 摘要 + 轻量函数/调用/DFG 提取，尚不是 Clang/LLVM 级精确分析。
+- 当前预处理使用 Tree-sitter 提取函数、参数和调用，并构建轻量 CFG/DFG，尚不是 Clang/LLVM 级精确分析。
 - 当前数据流是轻量 source-to-sink 分析，仍缺少完整指针别名、结构体字段和复杂控制流证明。
 - 当前 GNN baseline 是项目内置轻量 GCN，不是完整 Devign/Joern CPG 复现。
 - 当前后端任务使用 FastAPI BackgroundTasks，生产环境建议替换为 Redis/Celery/RQ。
@@ -426,7 +471,7 @@ git grep "TOKEN"
 
 ## 路线图
 
-- 使用 Clang/LLVM 或更完整的 Tree-sitter AST 替换轻量函数解析。
+- 使用 Clang/LLVM 增强宏展开、类型解析和编译单元级分析。
 - 增强跨文件调用图、def-use、alias 和指针分析。
 - 增加更完整的 CPG/Joern 风格 GNN baseline。
 - 跑完 Devign、Juliet、Big-Vul 子集的正式评测并保存阈值校准结果。

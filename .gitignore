@@ -2,7 +2,8 @@
 *.pyc
 __pycache__/
 .pytest_cache/
-storage/
+/storage/
+/build/
 out/
 frontend/node_modules/
 frontend/dist/

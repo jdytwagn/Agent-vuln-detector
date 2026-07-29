@@ -7,8 +7,8 @@ from pathlib import Path
 DEFAULT_AGENT_CHAIN = (
     "preprocess",
     "rule_reasoning",
-    "model_scoring",
     "dataflow_analysis",
+    "model_scoring",
     "semantic_reasoning",
     "exploitability_validation",
     "fusion_decision",

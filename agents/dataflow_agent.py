@@ -12,7 +12,7 @@ SOURCE_PATTERNS = {
     "network": re.compile(r"\b(recv|recvfrom|read_socket|socket_read)\b"),
     "environment": re.compile(r"\bgetenv\s*\("),
 }
-SANITIZER_RE = re.compile(r"\b(validate|sanitize|escape|allowed|whitelist|realpath|strncmp|strlen|sizeof)\b")
+SANITIZER_RE = re.compile(r"\b(validate|sanitize|escape|is_allowed|whitelist_check|canonicalize_path)\s*\(")
 ASSIGNMENT_RE = re.compile(r"\b(?P<dst>[A-Za-z_]\w*)\s*=\s*(?P<src>[^;]+);")
 
 
@@ -92,11 +92,12 @@ class DataFlowAgent:
                             tainted.add(var)
                     steps.append(f"Source pattern '{name}' observed: {line.strip()}")
             match = ASSIGNMENT_RE.search(line)
-            if match and any(var in match.group("src") for var in tainted):
+            source_identifiers = set(re.findall(r"\b[A-Za-z_]\w*\b", match.group("src"))) if match else set()
+            if match and source_identifiers & tainted:
                 tainted.add(match.group("dst"))
                 steps.append(f"Taint propagates to {match.group('dst')}: {line.strip()}")
             if SANITIZER_RE.search(line):
-                steps.append(f"Potential validation/sanitization observed: {line.strip()}")
+                steps.append(f"Potential validation routine observed: {line.strip()}")
         return tainted, source_name, steps
 
     def _cross_function_path(
@@ -115,7 +116,8 @@ class DataFlowAgent:
             tainted, source_name, steps = self._tainted_variables(caller)
             call_lines = [line.strip() for line in caller.code.splitlines() if re.search(rf"\b{function.name}\s*\(", line)]
             for line in call_lines:
-                if any(var in line for var in tainted):
+                line_identifiers = set(re.findall(r"\b[A-Za-z_]\w*\b", line))
+                if line_identifiers & tainted:
                     call_line_number = self._line_number_for(caller, line)
                     scope = (
                         "cross_file"
@@ -137,7 +139,12 @@ class DataFlowAgent:
     def _argument_variables(self, arguments: list[str]) -> list[str]:
         variables: list[str] = []
         for arg in arguments:
-            names = [name for name in re.findall(r"\b[A-Za-z_]\w*\b", arg) if name not in {"NULL", "sizeof"}]
+            without_literals = re.sub(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'', " ", arg)
+            names = [
+                name
+                for name in re.findall(r"\b[A-Za-z_]\w*\b", without_literals)
+                if name not in {"NULL", "nullptr", "sizeof", "const", "char", "int", "long", "unsigned"}
+            ]
             variables.extend(names)
         return variables
 
@@ -161,9 +168,18 @@ class DataFlowAgent:
             if sink_line is not None and offset >= sink_line:
                 break
             match = SANITIZER_RE.search(line)
-            if match and (not relevant_variables or any(var in line for var in relevant_variables)):
+            identifiers = set(re.findall(r"\b[A-Za-z_]\w*\b", line))
+            if match and (not relevant_variables or bool(identifiers & relevant_variables)):
                 return True, match.group(0)
+            if self._is_relevant_bounds_check(line, relevant_variables):
+                return True, "bounds_check"
         return False, None
+
+    def _is_relevant_bounds_check(self, line: str, variables: set[str]) -> bool:
+        if not re.search(r"\bif\s*\(", line) or "strlen" not in line or "sizeof" not in line:
+            return False
+        identifiers = set(re.findall(r"\b[A-Za-z_]\w*\b", line))
+        return len(identifiers & variables) >= 2 and bool(re.search(r"<=|<|>=|>", line))
 
     def _line_number_for(self, function: FunctionInfo, stripped_line: str) -> int:
         for offset, line in enumerate(function.code.splitlines(), start=function.start_line):

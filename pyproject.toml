@@ -11,7 +11,7 @@ dependencies = ["fastapi", "uvicorn", "python-multipart", "pydantic", "tree-sitt
 
 [project.optional-dependencies]
 model = ["transformers", "torch", "safetensors", "huggingface-hub>=0.34.0,<1.0"]
-test = ["pytest"]
+test = ["pytest", "httpx2"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
@@ -20,3 +20,6 @@ testpaths = ["tests"]
 [tool.setuptools.packages.find]
 include = ["agents*", "backend*", "core*", "evaluation*", "models*", "reports*", "rules*"]
 exclude = ["frontend*", "storage*", "out*", "tests*"]
+
+[tool.setuptools.package-data]
+rules = ["*.yaml"]

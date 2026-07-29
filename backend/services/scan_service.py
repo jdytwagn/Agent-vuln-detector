@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import os
+import shutil
 import zipfile
+from io import BytesIO
 from pathlib import Path
+from typing import BinaryIO
 
 from backend.storage.repository import TaskRepository, utc_now
 from core.config import ScanConfig
@@ -30,17 +33,32 @@ class ScanService:
         return self.repository.create_scan(stored_path, model_backend)
 
     def prepare_upload(self, task_id: str, filename: str, content: bytes) -> str:
-        if len(content) > self.MAX_UPLOAD_BYTES:
-            raise ValueError(f"Uploaded file is too large: {len(content)} bytes")
+        return self.prepare_upload_stream(task_id, filename, BytesIO(content))
+
+    def prepare_upload_stream(self, task_id: str, filename: str, source: BinaryIO) -> str:
         target_dir = self.uploads_dir / task_id
         target_dir.mkdir(parents=True, exist_ok=True)
         upload_path = target_dir / self._safe_filename(filename)
-        upload_path.write_bytes(content)
+        written = 0
+        try:
+            with upload_path.open("wb") as destination:
+                while chunk := source.read(1024 * 1024):
+                    written += len(chunk)
+                    if written > self.MAX_UPLOAD_BYTES:
+                        raise ValueError(f"Uploaded file is too large: more than {self.MAX_UPLOAD_BYTES} bytes")
+                    destination.write(chunk)
+        except Exception:
+            upload_path.unlink(missing_ok=True)
+            raise
         if zipfile.is_zipfile(upload_path):
             extract_dir = target_dir / "extracted"
             extract_dir.mkdir(parents=True, exist_ok=True)
-            with zipfile.ZipFile(upload_path) as archive:
-                self._safe_extract(archive, extract_dir)
+            try:
+                with zipfile.ZipFile(upload_path) as archive:
+                    self._safe_extract(archive, extract_dir)
+            except Exception:
+                shutil.rmtree(extract_dir, ignore_errors=True)
+                raise
             return str(extract_dir.resolve())
         return str(upload_path.resolve())
 
@@ -113,9 +131,10 @@ class ScanService:
         infos = [info for info in archive.infolist() if not info.is_dir()]
         if len(infos) > self.MAX_ARCHIVE_FILES:
             raise ValueError(f"Archive contains too many files: {len(infos)}")
-        total_size = sum(max(info.file_size, 0) for info in infos)
-        if total_size > self.MAX_ARCHIVE_BYTES:
-            raise ValueError(f"Archive uncompressed size is too large: {total_size} bytes")
+        declared_size = sum(max(info.file_size, 0) for info in infos)
+        if declared_size > self.MAX_ARCHIVE_BYTES:
+            raise ValueError(f"Archive uncompressed size is too large: {declared_size} bytes")
+        extracted_size = 0
         for info in infos:
             member_name = info.filename.replace("\\", "/")
             member_path = Path(member_name)
@@ -126,7 +145,11 @@ class ScanService:
                 raise ValueError(f"Archive member escapes upload directory: {info.filename}")
             target.parent.mkdir(parents=True, exist_ok=True)
             with archive.open(info) as source, target.open("wb") as destination:
-                destination.write(source.read())
+                while chunk := source.read(1024 * 1024):
+                    extracted_size += len(chunk)
+                    if extracted_size > self.MAX_ARCHIVE_BYTES:
+                        raise ValueError(f"Archive expands beyond {self.MAX_ARCHIVE_BYTES} bytes")
+                    destination.write(chunk)
 
     def _is_relative_to(self, path: Path, root: Path) -> bool:
         try:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from core.config import ScanConfig
 from core.pipeline import VulnerabilityDetectionPipeline
 from evaluation.dataset import load_manifest
@@ -44,7 +46,7 @@ class GraphFeatureBaseline:
             alerts += int(summary.get("candidate_count", 0))
             valid_findings += 1 if sample.label == 1 and prediction == 1 else 0
             filtered_non_exploit += 1 if sample.non_exploitable and prediction == 0 else 0
-            total_loc += sample.loc or 1
+            total_loc += sample.loc or self._count_loc(sample.path)
 
         metrics = compute_metrics(
             dataset=dataset_name,
@@ -70,3 +72,15 @@ class GraphFeatureBaseline:
         cfg_edges = float(summary.get("cfg_edges", 0))
         raw = 0.18 * candidates + 0.08 * source_sinks + 0.01 * call_edges + 0.004 * dfg_edges + 0.002 * cfg_edges
         return round(max(0.0, min(0.99, raw)), 4)
+
+    def _count_loc(self, sample_path: str) -> int:
+        root = Path(sample_path)
+        paths = [root] if root.is_file() else list(root.rglob("*"))
+        return max(
+            1,
+            sum(
+                len(path.read_text(encoding="utf-8", errors="ignore").splitlines())
+                for path in paths
+                if path.is_file() and path.suffix.lower() in {".c", ".cc", ".cpp", ".cxx", ".h", ".hpp"}
+            ),
+        )
