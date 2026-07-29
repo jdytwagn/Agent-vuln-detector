@@ -7,6 +7,7 @@ name = "agent-vuln-detector"
 version = "0.1.0"
 description = "Agent-based C/C++ vulnerability detection platform"
 requires-python = ">=3.10"
+license = { file = "LICENSE" }
 dependencies = ["fastapi", "uvicorn", "python-multipart", "pydantic", "tree-sitter", "tree-sitter-cpp"]
 
 [project.optional-dependencies]
