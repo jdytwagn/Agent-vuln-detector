@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from core.types import CandidateVulnerability, ModelScore
 from models.input_builder import build_model_input
 from models.scorer import VulnerabilityScorer
@@ -22,7 +24,11 @@ class MockScorer(VulnerabilityScorer):
             score += 0.2
         if model_input.features.get("dataflow_reachable"):
             score += 0.08
-        if any(token in model_input.context for token in ("strlen", "sizeof", "snprintf", "validate", "sanitize", "allowed")):
+        has_validation = any(token in model_input.context for token in ("validate(", "sanitize(", "is_allowed("))
+        has_bounds_check = bool(
+            re.search(r"\bif\s*\([^\n]*(?:strlen)[^\n]*(?:<|<=|>|>=)[^\n]*sizeof", model_input.context)
+        )
+        if has_validation or has_bounds_check:
             score -= 0.18
         score = min(0.98, max(0.05, score))
         return ModelScore(

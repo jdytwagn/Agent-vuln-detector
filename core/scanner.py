@@ -28,7 +28,7 @@ class SourceScanner:
         self.max_file_bytes = max_file_bytes
 
     def collect(self, source_path: str) -> list[SourceFile]:
-        root = Path(source_path)
+        root = Path(source_path).resolve()
         if not root.exists():
             raise FileNotFoundError(f"Source path does not exist: {source_path}")
 
@@ -38,6 +38,9 @@ class SourceScanner:
         files: list[SourceFile] = []
         total_bytes = 0
         for path in paths:
+            resolved_path = path.resolve()
+            if root.is_dir() and not resolved_path.is_relative_to(root):
+                raise ValueError(f"Source entry escapes scan root through a link: {path}")
             language = SUPPORTED_EXTENSIONS.get(path.suffix.lower())
             if not language:
                 continue
@@ -55,7 +58,7 @@ class SourceScanner:
                 continue
             files.append(
                 SourceFile(
-                    path=str(path.resolve()),
+                    path=str(resolved_path),
                     language=language,
                     content=content,
                     lines=content.splitlines(),
