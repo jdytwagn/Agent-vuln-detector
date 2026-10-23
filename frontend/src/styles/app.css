@@ -304,6 +304,11 @@ select {
   background: #dbeafe;
 }
 
+.status-completed_with_errors {
+  color: #92400e;
+  background: #fef3c7;
+}
+
 .status-failed {
   color: #b42318;
   background: #fee2e2;
@@ -349,6 +354,10 @@ select {
   background: #fbfdff;
   border-radius: 8px;
   padding: 14px;
+}
+
+.finding.filtered {
+  background: #f8fafc;
 }
 
 .finding header,

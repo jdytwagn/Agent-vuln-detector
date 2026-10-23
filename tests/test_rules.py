@@ -21,6 +21,33 @@ def test_mitigated_case_is_filtered_or_lower_risk() -> None:
     strcpy = next(item for item in report.vulnerabilities if item.sink == "strcpy")
     assert strcpy.exploitability in {"not_exploitable", "uncertain"}
     assert strcpy.final_decision in {"filtered_false_positive", "needs_review", "low_risk"}
+    if strcpy.final_decision == "filtered_false_positive":
+        assert report.summary["reported_count"] == 0
+        assert report.summary["filtered_count"] == 1
+
+
+def test_literal_copy_is_not_reported_and_unbounded_copies_are(tmp_path: Path) -> None:
+    source = tmp_path / "copies.c"
+    source.write_text(
+        "void literal_copy(void) {\n"
+        "  char buffer[16];\n"
+        "  strcpy(buffer, \"hello\");\n"
+        "}\n"
+        "void raw_copy(char *input) {\n"
+        "  char buffer[8];\n"
+        "  memcpy(buffer, input, 64);\n"
+        "  scanf(\"%s\", buffer);\n"
+        "  scanf(\"%10s\", buffer);\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    report = VulnerabilityDetectionPipeline().run(str(source))
+    sinks = [item.sink for item in report.vulnerabilities]
+
+    assert "strcpy" not in sinks
+    assert sinks.count("memcpy") == 1
+    assert sinks.count("scanf") == 1
 
 
 def test_literal_printf_and_checked_allocation_are_not_vulnerabilities(tmp_path: Path) -> None:

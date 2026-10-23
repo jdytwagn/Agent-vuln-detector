@@ -19,6 +19,7 @@ class GnnTrainingSummary:
     train_samples: int
     eval_samples: int
     overlap_samples: int
+    held_out: bool
     seed: int
     loss: float
     device: str
@@ -51,13 +52,23 @@ class GnnBaselineEvaluator:
 
     def evaluate(self, manifest_path: str, threshold: float | None = None) -> dict[str, Any]:
         torch = self._torch()
-        dataset_name, samples = load_manifest(manifest_path)
-        graphs = [self._build_graph(sample, torch) for sample in samples]
+        dataset_name, manifest_samples = load_manifest(manifest_path)
+        samples: list[EvaluationSample] = []
+        graphs = []
+        skipped: list[dict[str, str]] = []
+        for sample in manifest_samples:
+            try:
+                graphs.append(self._build_graph(sample, torch))
+            except Exception as exc:
+                skipped.append({"sample_id": sample.sample_id, "error": f"{type(exc).__name__}: {exc}"})
+                continue
+            samples.append(sample)
+        if not samples:
+            raise RuntimeError("GNN baseline could not build a graph for any manifest sample")
         labels = [sample.label for sample in samples]
-        train_indices, eval_indices = self._split(labels)
-        if not train_indices:
+        train_indices, eval_indices, held_out = self._split(labels)
+        if not held_out:
             train_indices = list(range(len(samples)))
-        if not eval_indices:
             eval_indices = list(range(len(samples)))
 
         random.seed(self.seed)
@@ -101,7 +112,6 @@ class GnnBaselineEvaluator:
             predictions=eval_predictions,
             alerts=alerts,
             total_loc=sum(samples[index].loc or self._count_loc(samples[index].path) for index in eval_indices),
-            valid_findings=sum(1 for label, pred in zip(eval_labels, eval_predictions) if label == 1 and pred == 1),
             cross_file_mask=[samples[index].cross_file for index in eval_indices],
             exploitable_mask=[samples[index].exploitable for index in eval_indices],
             non_exploit_mask=[samples[index].non_exploitable for index in eval_indices],
@@ -116,6 +126,7 @@ class GnnBaselineEvaluator:
             train_samples=len(train_indices),
             eval_samples=len(eval_indices),
             overlap_samples=len(set(train_indices) & set(eval_indices)),
+            held_out=held_out,
             seed=self.seed,
             loss=round(last_loss, 4),
             device="cpu",
@@ -127,15 +138,11 @@ class GnnBaselineEvaluator:
             "calibration": calibration.to_dict(),
             "threshold": selected_threshold,
             "training": training.to_dict(),
+            "skipped_samples": skipped,
         }
 
     def _build_graph(self, sample: EvaluationSample, torch: Any) -> tuple[Any, Any]:
-        try:
-            ir = self.preprocess.run(self.scanner.collect(sample.path))
-        except Exception:
-            features = torch.zeros((1, self.FEATURE_DIM), dtype=torch.float32)
-            adjacency = torch.eye(1, dtype=torch.float32)
-            return features, adjacency
+        ir = self.preprocess.run(self.scanner.collect(sample.path))
 
         nodes: list[tuple[str, list[float]]] = []
         node_index: dict[str, int] = {}
@@ -233,22 +240,25 @@ class GnnBaselineEvaluator:
     def _dfg_node_id(self, file_path: str, function_name: str, var_name: str, line: int) -> str:
         return f"dfg:{file_path}:{function_name}:{var_name}:{line}"
 
-    def _split(self, labels: list[int]) -> tuple[list[int], list[int]]:
+    def _split(self, labels: list[int]) -> tuple[list[int], list[int], bool]:
         positives = [index for index, label in enumerate(labels) if label == 1]
         negatives = [index for index, label in enumerate(labels) if label == 0]
+        if len(positives) < 2 or len(negatives) < 2:
+            indices = list(range(len(labels)))
+            return indices, indices, False
         rng = random.Random(self.seed)
         rng.shuffle(positives)
         rng.shuffle(negatives)
 
         def split_class(indices: list[int]) -> tuple[list[int], list[int]]:
-            if len(indices) <= 1:
-                return indices[:], indices[:]
             cutoff = max(1, int(len(indices) * 0.7))
+            if cutoff >= len(indices):
+                cutoff = len(indices) - 1
             return indices[:cutoff], indices[cutoff:]
 
         pos_train, pos_eval = split_class(positives)
         neg_train, neg_eval = split_class(negatives)
-        return pos_train + neg_train, pos_eval + neg_eval
+        return pos_train + neg_train, pos_eval + neg_eval, True
 
     def _count_loc(self, sample_path: str) -> int:
         root = Path(sample_path)

@@ -108,4 +108,8 @@ class EvaluationSuite:
         try:
             payload["runs"][name] = runner()
         except Exception as exc:
-            payload["failed"][name] = f"{type(exc).__name__}: {exc}"
+            message = f"{type(exc).__name__}: {exc}"
+            if name == "gnn_baseline" and "PyTorch" in str(exc):
+                payload["skipped"][name] = message
+                return
+            payload["failed"][name] = message

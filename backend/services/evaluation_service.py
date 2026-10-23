@@ -6,7 +6,7 @@ from pathlib import Path
 
 from backend.storage.repository import TaskRepository, utc_now
 from core.config import ScanConfig
-from evaluation.baselines import DOCUMENT_BASELINES
+from evaluation.baselines import evaluation_payload
 from evaluation.evaluator import DatasetEvaluator
 from evaluation.suite import EvaluationSuite
 
@@ -65,15 +65,17 @@ class EvaluationService:
                         enable_llm_semantics=enable_llm_semantics,
                     )
                 ).evaluate(manifest_path)
-                payload = {"proposed_agent": metrics.to_dict(), "document_baselines": DOCUMENT_BASELINES}
+                payload = evaluation_payload(metrics.to_dict())
             output_path = self.output_dir / f"{task_id}.json"
             output_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+            failed = payload.get("failed") or {}
             self.repository.update_evaluation(
                 task_id,
-                status="completed",
+                status="completed_with_errors" if failed else "completed",
                 completed_at=utc_now(),
                 metrics_json=payload,
                 output_path=str(output_path.resolve()),
+                error="; ".join(f"{name}: {reason}" for name, reason in failed.items()) if failed else None,
             )
         except Exception as exc:
             self.repository.update_evaluation(task_id, status="failed", completed_at=utc_now(), error=str(exc))

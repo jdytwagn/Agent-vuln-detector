@@ -243,7 +243,7 @@ python main.py scan tests/samples --model-backend graphcodebert --model-path sto
 说明：
 
 - `--strict-model` 用于正式实验。开启后，如果真实模型加载失败，系统会直接报错。
-- 不开启 `--strict-model` 时，模型不可用会降级为 mock scorer，适合演示和离线联调。
+- 不开启 `--strict-model` 时，模型不可用会降级为 mock scorer，适合演示和离线联调。降级会写入报告和任务摘要的 `model_fallback`，Web 任务详情会提示，不会显示成真实模型已经跑完。
 - 如果模型的 `id2label` 只有 `LABEL_0/LABEL_1` 而没有明确语义，请在 `.env` 中设置 `AGENT_DETECTOR_MODEL_POSITIVE_LABEL`，例如 `LABEL_1`；系统不会再盲猜正类方向。
 
 ## 后端 API
@@ -282,6 +282,8 @@ python main.py evaluate evaluation/sample_manifest.json --output out/evaluation.
 ```powershell
 python main.py evaluate-suite evaluation/sample_manifest.json --skip-code-models --gnn-epochs 1 --output out/evaluation_suite_sample.json
 ```
+
+缺少 PyTorch 时，GNN 基线记为跳过，命令仍成功。某个基线真正失败时，命令以退出码 2 结束，并在输出 JSON 的 `failed` 字段写明原因。
 
 模型 baseline：
 

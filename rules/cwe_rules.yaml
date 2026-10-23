@@ -1,7 +1,7 @@
 - rule_id: C_RULE_001
   cwe: CWE-120
   owasp: A03:2021-Injection
-  name: Unsafe buffer copy
+  name: 不安全的缓冲区复制
   severity: high
   sink_pattern: strcpy
   source_types: argv, stdin, file, network, environment, parameter
@@ -9,12 +9,12 @@
   preconditions: destination buffer size unknown, source length unchecked
   filters: strlen, sizeof, strncpy, snprintf, validate
   tags: buffer-overflow, memory-safety
-  description: Copies data into a destination buffer without an explicit length bound.
-  recommendation: Use bounded copy routines and validate destination buffer size.
+  description: 向目标缓冲区复制数据时没有显式长度限制。
+  recommendation: 使用带长度限制的复制函数，并在复制前检查目标缓冲区大小。
 - rule_id: C_RULE_002
   cwe: CWE-120
   owasp: A03:2021-Injection
-  name: Unsafe buffer concatenation
+  name: 不安全的缓冲区拼接
   severity: high
   sink_pattern: strcat
   source_types: argv, stdin, file, network, environment, parameter
@@ -22,12 +22,12 @@
   preconditions: remaining destination capacity unknown
   filters: strlen, sizeof, strncat, validate
   tags: buffer-overflow, memory-safety
-  description: Concatenates data without proving that the destination has enough capacity.
-  recommendation: Use bounded concatenation and check remaining capacity.
+  description: 拼接数据时没有证明目标缓冲区还有足够空间。
+  recommendation: 使用带长度限制的拼接函数，并检查剩余容量。
 - rule_id: C_RULE_003
   cwe: CWE-134
   owasp: A03:2021-Injection
-  name: Unbounded formatted output
+  name: 无边界的格式化输出
   severity: high
   sink_pattern: sprintf
   source_types: argv, stdin, file, network, environment, parameter
@@ -35,12 +35,12 @@
   preconditions: output buffer length not enforced
   filters: snprintf, sizeof, validate
   tags: buffer-overflow, format
-  description: Writes formatted data without a maximum output length.
-  recommendation: Prefer snprintf and validate the output buffer length.
+  description: 格式化写入没有限制最大输出长度。
+  recommendation: 改用 snprintf，并校验输出缓冲区长度。
 - rule_id: C_RULE_004
   cwe: CWE-242
   owasp: A04:2021-Insecure Design
-  name: Dangerous input function
+  name: 危险输入函数
   severity: critical
   sink_pattern: gets
   source_types: stdin
@@ -48,12 +48,12 @@
   preconditions: input length unbounded
   filters: fgets
   tags: unsafe-api, input
-  description: Reads input without bounds and cannot be used safely.
-  recommendation: Replace gets with fgets or another bounded input routine.
+  description: gets 读取输入时没有长度上限，无法安全使用。
+  recommendation: 用 fgets 或其他有长度限制的输入函数替换 gets。
 - rule_id: C_RULE_005
   cwe: CWE-78
   owasp: A03:2021-Injection
-  name: Command execution sink
+  name: 命令执行
   severity: critical
   sink_pattern: system
   source_types: argv, stdin, file, network, environment, parameter
@@ -61,12 +61,12 @@
   preconditions: command string is attacker-controlled
   filters: allowlist, validate, escape
   tags: command-injection, injection
-  description: Executes a shell command that may be attacker-controlled.
-  recommendation: Avoid shell execution or validate command arguments with an allowlist.
+  description: 执行的 shell 命令可能受攻击者控制。
+  recommendation: 避免调用 shell，或用白名单校验命令参数。
 - rule_id: C_RULE_006
   cwe: CWE-78
   owasp: A03:2021-Injection
-  name: Process execution sink
+  name: 进程执行
   severity: critical
   sink_pattern: popen
   source_types: argv, stdin, file, network, environment, parameter
@@ -74,12 +74,12 @@
   preconditions: command string is attacker-controlled
   filters: allowlist, validate, escape
   tags: command-injection, injection
-  description: Opens a process through a shell command that may be attacker-controlled.
-  recommendation: Avoid shell invocation and pass validated arguments to safer APIs.
+  description: 通过 shell 启动进程，命令可能受攻击者控制。
+  recommendation: 避免经由 shell 启动进程，改为向更安全的 API 传递已校验参数。
 - rule_id: C_RULE_007
   cwe: CWE-22
   owasp: A01:2021-Broken Access Control
-  name: Path-sensitive file open
+  name: 路径敏感的文件打开
   severity: medium
   sink_pattern: fopen
   source_types: argv, stdin, file, network, environment, parameter
@@ -87,12 +87,12 @@
   preconditions: path may cross trust boundary
   filters: realpath, allowlist, base directory check
   tags: path-traversal, file
-  description: Opens a file path that may be influenced by untrusted input.
-  recommendation: Canonicalize paths and enforce an allowlist or base directory.
+  description: 打开的文件路径可能受不可信输入影响。
+  recommendation: 先规范化路径，再用白名单或基准目录限制访问范围。
 - rule_id: C_RULE_008
   cwe: CWE-252
   owasp: A04:2021-Insecure Design
-  name: Potential unchecked allocation
+  name: 可能未检查的内存分配
   severity: medium
   sink_pattern: malloc
   source_types: internal, parameter
@@ -100,12 +100,12 @@
   preconditions: allocation result may be dereferenced
   filters: null check, error handling
   tags: unchecked-return, memory-safety
-  description: Allocated memory should be checked before dereference.
-  recommendation: Check allocation results and handle failure before use.
+  description: 分配得到的内存在使用前应检查是否成功。
+  recommendation: 检查分配结果，失败时不要继续解引用。
 - rule_id: C_RULE_009
   cwe: CWE-416
   owasp: A04:2021-Insecure Design
-  name: Potential use-after-free precursor
+  name: 释放后使用前兆
   severity: high
   sink_pattern: free
   source_types: internal, parameter
@@ -113,12 +113,12 @@
   preconditions: pointer may be reused after release
   filters: set null, ownership transfer
   tags: use-after-free, memory-safety
-  description: Frees memory and requires follow-up ownership/lifetime validation.
-  recommendation: Clear freed pointers and avoid reuse after ownership release.
+  description: 内存释放后还需要确认指针不会被再次使用。
+  recommendation: 释放后将指针置空，并避免所有权结束后继续使用。
 - rule_id: C_RULE_010
   cwe: CWE-134
   owasp: A03:2021-Injection
-  name: Format string sink
+  name: 格式化字符串
   severity: high
   sink_pattern: printf
   source_types: argv, stdin, file, network, environment, parameter
@@ -126,5 +126,44 @@
   preconditions: format string may be externally controlled
   filters: constant format string
   tags: format-string, injection
-  description: Uses formatted output where the format string may be attacker-controlled.
-  recommendation: Use a constant format string and pass untrusted data as arguments.
+  description: 格式化字符串可能来自外部输入。
+  recommendation: 使用常量格式串，把不可信数据作为参数传入。
+- rule_id: C_RULE_011
+  cwe: CWE-120
+  owasp: A03:2021-Injection
+  name: 无宽度限制的 scanf
+  severity: high
+  sink_pattern: scanf
+  source_types: stdin
+  sink_types: input
+  preconditions: conversion writes a string without a field width
+  filters: fgets, width
+  tags: buffer-overflow, input
+  description: scanf 使用 %s 或扫描集时没有字段宽度，可能写越界。
+  recommendation: 为字符串转换指定宽度，或改用 fgets。
+- rule_id: C_RULE_012
+  cwe: CWE-120
+  owasp: A03:2021-Injection
+  name: 无边界的内存复制
+  severity: high
+  sink_pattern: memcpy
+  source_types: argv, stdin, file, network, environment, parameter
+  sink_types: memory_copy
+  preconditions: copy length is not the destination size
+  filters: sizeof
+  tags: buffer-overflow, memory-safety
+  description: memcpy 的拷贝长度没有绑定到目标缓冲区大小。
+  recommendation: 使用目标缓冲区大小作为上限，并在拷贝前比较长度。
+- rule_id: C_RULE_013
+  cwe: CWE-120
+  owasp: A03:2021-Injection
+  name: 无边界的内存移动
+  severity: high
+  sink_pattern: memmove
+  source_types: argv, stdin, file, network, environment, parameter
+  sink_types: memory_copy
+  preconditions: move length is not the destination size
+  filters: sizeof
+  tags: buffer-overflow, memory-safety
+  description: memmove 的移动长度没有绑定到目标缓冲区大小。
+  recommendation: 使用目标缓冲区大小作为上限，并在移动前比较长度。

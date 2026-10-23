@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import re
 
+from agents.mitigations import INPUT_CALLS, mitigation_on_line
 from core.types import CandidateVulnerability, CodebaseIR, DataFlowPath, FunctionInfo
 
 
+CALL_RE = re.compile(r"\b(?P<callee>[A-Za-z_]\w*)\s*\((?P<args>[^;{}]*)\)")
 SOURCE_PATTERNS = {
     "argv": re.compile(r"\bargv\s*\[|\bargc\b"),
     "stdin": re.compile(r"\b(stdin|scanf|fgets|gets)\b"),
@@ -41,7 +43,7 @@ class DataFlowAgent:
                 return cross
 
         tainted, source_name, steps = self._tainted_variables(function)
-        sanitized, sanitizer = self._sanitizer_for(function, candidate.line, sink_vars)
+        sanitized, sanitizer = self._sanitizer_for(function, candidate.line, sink_vars, candidate.rule_evidence.filters)
 
         for var in sink_vars:
             if var in tainted:
@@ -49,7 +51,7 @@ class DataFlowAgent:
                     reachable=True,
                     source=source_name,
                     sink=candidate.sink,
-                    steps=steps + [f"{var} reaches {candidate.sink} at line {candidate.line}"],
+                    steps=steps + [f"{var} 在第 {candidate.line} 行到达 {candidate.sink}"],
                     scope="intra_function",
                     sanitized=sanitized,
                     sanitizer=sanitizer,
@@ -61,7 +63,7 @@ class DataFlowAgent:
                 reachable=True,
                 source=direct_source,
                 sink=candidate.sink,
-                steps=[f"{direct_source} is passed directly into {candidate.sink} at line {candidate.line}"],
+                steps=[f"{direct_source} 在第 {candidate.line} 行直接传入 {candidate.sink}"],
                 scope="intra_function",
                 sanitized=sanitized,
                 sanitizer=sanitizer,
@@ -70,7 +72,7 @@ class DataFlowAgent:
         return DataFlowPath(
             reachable=False,
             sink=candidate.sink,
-            steps=["No source-to-sink path found in lightweight analysis."],
+            steps=["轻量分析没有找到 source 到 sink 的路径。"],
             scope="none",
             sanitized=sanitized,
             sanitizer=sanitizer,
@@ -80,24 +82,33 @@ class DataFlowAgent:
         tainted: set[str] = set(function.parameters)
         source_name = "function parameter" if function.parameters else None
         steps: list[str] = []
+        observed_sources: set[str] = set()
         if function.parameters:
-            steps.append(f"Parameters considered externally controllable: {', '.join(function.parameters)}")
+            steps.append(f"函数参数视为外部可控：{', '.join(function.parameters)}")
 
         for line in function.code.splitlines():
             for name, pattern in SOURCE_PATTERNS.items():
-                if pattern.search(line):
-                    source_name = name
-                    for var in re.findall(r"\b[A-Za-z_]\w*\b", line):
-                        if var not in {"if", "while", "return", "char", "int", "size_t"}:
-                            tainted.add(var)
-                    steps.append(f"Source pattern '{name}' observed: {line.strip()}")
+                if not pattern.search(line):
+                    continue
+                source_name = name
+                if name not in observed_sources:
+                    observed_sources.add(name)
+                    steps.append(f"观察到来源 {name}：{line.strip()}")
+                assigned = ASSIGNMENT_RE.search(line)
+                if assigned:
+                    tainted.add(assigned.group("dst"))
+                for call in CALL_RE.finditer(line):
+                    if call.group("callee") not in INPUT_CALLS:
+                        continue
+                    for variable in self._argument_variables([call.group("args")]):
+                        tainted.add(variable)
             match = ASSIGNMENT_RE.search(line)
             source_identifiers = set(re.findall(r"\b[A-Za-z_]\w*\b", match.group("src"))) if match else set()
             if match and source_identifiers & tainted:
                 tainted.add(match.group("dst"))
-                steps.append(f"Taint propagates to {match.group('dst')}: {line.strip()}")
+                steps.append(f"污点传播到 {match.group('dst')}：{line.strip()}")
             if SANITIZER_RE.search(line):
-                steps.append(f"Potential validation routine observed: {line.strip()}")
+                steps.append(f"观察到可能的校验：{line.strip()}")
         return tainted, source_name, steps
 
     def _cross_function_path(
@@ -124,12 +135,12 @@ class DataFlowAgent:
                         if cross_file_calls.get((caller.name, function.name, caller.file_path, call_line_number), False)
                         else "cross_function"
                     )
-                    sanitized, sanitizer = self._sanitizer_for(function, candidate.line, sink_vars)
+                    sanitized, sanitizer = self._sanitizer_for(function, candidate.line, sink_vars, candidate.rule_evidence.filters)
                     return DataFlowPath(
                         reachable=True,
                         source=source_name or "caller-controlled argument",
                         sink=candidate.sink,
-                        steps=steps + [f"Caller {caller.name} passes tainted data to {function.name}: {line}"],
+                        steps=steps + [f"调用方 {caller.name} 把污点数据传给 {function.name}：{line}"],
                         scope=scope,
                         sanitized=sanitized,
                         sanitizer=sanitizer,
@@ -162,24 +173,16 @@ class DataFlowAgent:
         function: FunctionInfo,
         sink_line: int | None = None,
         variables: list[str] | set[str] | None = None,
+        filters: list[str] | None = None,
     ) -> tuple[bool, str | None]:
         relevant_variables = {var for var in (variables or []) if var not in {"NULL", "sizeof"}}
         for offset, line in enumerate(function.code.splitlines(), start=function.start_line):
             if sink_line is not None and offset >= sink_line:
                 break
-            match = SANITIZER_RE.search(line)
-            identifiers = set(re.findall(r"\b[A-Za-z_]\w*\b", line))
-            if match and (not relevant_variables or bool(identifiers & relevant_variables)):
-                return True, match.group(0)
-            if self._is_relevant_bounds_check(line, relevant_variables):
-                return True, "bounds_check"
+            mitigation = mitigation_on_line(line, relevant_variables, filters)
+            if mitigation:
+                return True, mitigation
         return False, None
-
-    def _is_relevant_bounds_check(self, line: str, variables: set[str]) -> bool:
-        if not re.search(r"\bif\s*\(", line) or "strlen" not in line or "sizeof" not in line:
-            return False
-        identifiers = set(re.findall(r"\b[A-Za-z_]\w*\b", line))
-        return len(identifiers & variables) >= 2 and bool(re.search(r"<=|<|>=|>", line))
 
     def _line_number_for(self, function: FunctionInfo, stripped_line: str) -> int:
         for offset, line in enumerate(function.code.splitlines(), start=function.start_line):

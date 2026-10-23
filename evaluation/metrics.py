@@ -35,6 +35,12 @@ def false_positive_rate(labels: list[int], predictions: list[int]) -> float:
     return round(fp / (fp + tn), 4) if fp + tn else 0.0
 
 
+def precision_score(labels: list[int], predictions: list[int]) -> float:
+    tp = sum(1 for label, pred in zip(labels, predictions) if label == 1 and pred == 1)
+    fp = sum(1 for label, pred in zip(labels, predictions) if label == 0 and pred == 1)
+    return round(tp / (tp + fp), 4) if tp + fp else 0.0
+
+
 def recall_for_mask(labels: list[int], predictions: list[int], mask: list[bool]) -> float:
     selected = [(label, pred) for label, pred, keep in zip(labels, predictions, mask) if keep and label == 1]
     if not selected:
@@ -50,7 +56,6 @@ def compute_metrics(
     predictions: list[int],
     alerts: int,
     total_loc: int,
-    valid_findings: int,
     cross_file_mask: list[bool],
     exploitable_mask: list[bool],
     non_exploit_mask: list[bool],
@@ -64,7 +69,7 @@ def compute_metrics(
         f1=f1_score(labels, predictions),
         fpr=false_positive_rate(labels, predictions),
         alerts_per_kloc=round(alerts / kloc, 4),
-        valid_ratio=round(valid_findings / alerts, 4) if alerts else 0.0,
+        valid_ratio=precision_score(labels, predictions),
         cross_file_recall=recall_for_mask(labels, predictions, cross_file_mask),
         exploitability_recall=recall_for_mask(labels, predictions, exploitable_mask),
         non_exploit_filter=round(filtered_non_exploit / max(sum(non_exploit_mask), 1), 4),
