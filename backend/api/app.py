@@ -15,6 +15,7 @@ from backend.services.evaluation_service import EvaluationService
 from backend.services.scan_service import ScanService
 from backend.storage.repository import TaskRepository
 from core.config import ScanConfig
+from core.pipeline import validate_agent_chain
 from core.env import get_env
 from evaluation.adapters import prepare_dataset
 from rules.rule_loader import load_rules
@@ -58,9 +59,18 @@ def health() -> dict:
     return {"status": "ok", "service": "agent-vuln-detector"}
 
 
+def _agent_chain(agent_chain: list[str] | None) -> tuple[str, ...] | None:
+    if not agent_chain:
+        return None
+    chain = tuple(agent_chain)
+    validate_agent_chain(chain)
+    return chain
+
+
 @app.post("/api/scans", dependencies=[Depends(require_api_key)])
 def create_scan(payload: ScanCreate, background_tasks: BackgroundTasks) -> dict:
     try:
+        chain = _agent_chain(payload.agent_chain)
         task = scan_service.create_path_scan(payload.source_path, payload.model_backend)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -71,7 +81,7 @@ def create_scan(payload: ScanCreate, background_tasks: BackgroundTasks) -> dict:
         payload.model_backend,
         payload.model_path,
         payload.strict_model,
-        tuple(payload.agent_chain) if payload.agent_chain else None,
+        chain,
         payload.enable_llm_semantics,
         payload.max_scan_files,
         payload.max_scan_bytes,
@@ -90,6 +100,12 @@ async def upload_scan(
     agent_chain: str | None = Form(None),
     enable_llm_semantics: bool = Form(False),
 ) -> dict:
+    chain = tuple(part.strip() for part in agent_chain.split(",") if part.strip()) if agent_chain else None
+    try:
+        if chain:
+            validate_agent_chain(chain)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     task = scan_service.create_path_scan(file.filename or "upload", model_backend, validate_path=False)
     try:
         source_path = await run_in_threadpool(
@@ -101,7 +117,6 @@ async def upload_scan(
     except (ValueError, OSError, zipfile.BadZipFile) as exc:
         repository.update_scan(task["id"], status="failed", error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    chain = tuple(part.strip() for part in agent_chain.split(",") if part.strip()) if agent_chain else None
     background_tasks.add_task(scan_service.run_scan, task["id"], source_path, model_backend, model_path, strict_model, chain, enable_llm_semantics)
     return repository.get_scan(task["id"])
 
@@ -163,6 +178,7 @@ def prepare_dataset_manifest(payload: DatasetPrepareCreate) -> dict:
 @app.post("/api/evaluations", dependencies=[Depends(require_api_key)])
 def create_evaluation(payload: EvaluationCreate, background_tasks: BackgroundTasks) -> dict:
     try:
+        chain = _agent_chain(payload.agent_chain)
         task = evaluation_service.create_evaluation(payload.manifest_path, payload.model_backend)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -173,7 +189,7 @@ def create_evaluation(payload: EvaluationCreate, background_tasks: BackgroundTas
         payload.model_backend,
         payload.model_path,
         payload.strict_model,
-        tuple(payload.agent_chain) if payload.agent_chain else None,
+        chain,
         payload.enable_llm_semantics,
         payload.run_baseline_suite,
         payload.codebert_model_path,

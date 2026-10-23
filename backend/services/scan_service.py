@@ -9,6 +9,7 @@ from typing import BinaryIO
 
 from backend.storage.repository import TaskRepository, utc_now
 from core.config import ScanConfig
+from core.scanner import SUPPORTED_EXTENSIONS
 from core.pipeline import VulnerabilityDetectionPipeline
 from reports.json_reporter import JsonReporter
 from reports.markdown_reporter import MarkdownReporter
@@ -60,6 +61,10 @@ class ScanService:
                 shutil.rmtree(extract_dir, ignore_errors=True)
                 raise
             return str(extract_dir.resolve())
+        if upload_path.suffix.lower() not in SUPPORTED_EXTENSIONS:
+            upload_path.unlink(missing_ok=True)
+            supported = ", ".join(sorted(SUPPORTED_EXTENSIONS))
+            raise ValueError(f"不支持的上传文件。请上传 C/C++ 源码（{supported}）或包含源码的 .zip。")
         return str(upload_path.resolve())
 
     def run_scan(

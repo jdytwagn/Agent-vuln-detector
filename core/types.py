@@ -153,6 +153,7 @@ class RuleEvidence:
     description: str
     recommendation: str
     matched_text: str
+    filters: list[str] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
 
 

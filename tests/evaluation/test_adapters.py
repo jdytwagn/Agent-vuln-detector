@@ -7,6 +7,34 @@ from pathlib import Path
 from evaluation.adapters import prepare_dataset
 
 
+def test_juliet_adapter_splits_good_and_bad_functions(tmp_path: Path) -> None:
+    root = tmp_path / "juliet"
+    case_dir = root / "testcases" / "CWE121"
+    case_dir.mkdir(parents=True)
+    mixed = case_dir / "CWE121_Stack_Based_Buffer_Overflow__char_01.c"
+    mixed.write_text(
+        "#include <string.h>\n"
+        "void bad(char *input) { char buf[8]; strcpy(buf, input); }\n"
+        "void good(char *input) { char buf[8]; strncpy(buf, input, sizeof(buf) - 1); }\n",
+        encoding="utf-8",
+    )
+    named_good = case_dir / "CWE121_good_name.c"
+    named_good.write_text("void bad(char *input) { char buf[8]; strcpy(buf, input); }\n", encoding="utf-8")
+    output = tmp_path / "juliet_manifest.json"
+
+    prepare_dataset("juliet-c", str(root), str(output), str(tmp_path / "materialized"))
+
+    manifest = json.loads(output.read_text(encoding="utf-8"))
+    labels = {sample["sample_id"]: sample["label"] for sample in manifest["samples"]}
+    assert labels["testcases/CWE121/CWE121_Stack_Based_Buffer_Overflow__char_01.c#bad"] == 1
+    assert labels["testcases/CWE121/CWE121_Stack_Based_Buffer_Overflow__char_01.c#good"] == 0
+    assert labels["testcases/CWE121/CWE121_good_name.c"] == 1
+    bad_sample = next(sample for sample in manifest["samples"] if sample["sample_id"].endswith("#bad"))
+    bad_text = Path(bad_sample["path"]).read_text(encoding="utf-8")
+    assert "void bad" in bad_text
+    assert "void good" not in bad_text
+
+
 def test_devign_csv_adapter_materializes_code(tmp_path: Path) -> None:
     tmp_path.mkdir(parents=True, exist_ok=True)
     csv_path = tmp_path / "devign.csv"

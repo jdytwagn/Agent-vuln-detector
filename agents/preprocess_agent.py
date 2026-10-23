@@ -31,7 +31,21 @@ IDENTIFIER_RE = re.compile(r"\b[A-Za-z_]\w*\b")
 CONTROL_WORDS = {"if", "for", "while", "switch", "return", "sizeof"}
 TYPE_WORDS = {"char", "int", "size_t", "long", "short", "float", "double", "void", "FILE", "static", "const", "unsigned", "signed", "return"}
 SOURCE_NAMES = {"argv", "argc", "stdin", "scanf", "fgets", "gets", "fread", "read", "getline", "fscanf", "recv", "recvfrom", "getenv"}
-SINK_NAMES = {"strcpy", "strcat", "sprintf", "gets", "system", "popen", "fopen", "malloc", "free", "printf"}
+SINK_NAMES = {
+    "strcpy",
+    "strcat",
+    "sprintf",
+    "gets",
+    "scanf",
+    "memcpy",
+    "memmove",
+    "system",
+    "popen",
+    "fopen",
+    "malloc",
+    "free",
+    "printf",
+}
 SANITIZER_NAMES = {"strlen", "sizeof", "snprintf", "strncpy", "strncat", "validate", "sanitize", "allowed", "whitelist", "realpath", "strncmp"}
 
 
@@ -40,6 +54,7 @@ class PreprocessAgent:
 
     def __init__(self, parser_backend: str = "lightweight") -> None:
         self.parser_backend = parser_backend
+        self.parser_error: str | None = None
 
     def run(self, files: list[SourceFile]) -> CodebaseIR:
         functions: list[FunctionInfo] = []
@@ -216,8 +231,11 @@ class PreprocessAgent:
             from tree_sitter import Language, Parser
             import tree_sitter_cpp
 
-            return Parser(Language(tree_sitter_cpp.language()))
-        except Exception:
+            parser = Parser(Language(tree_sitter_cpp.language()))
+            self.parser_error = None
+            return parser
+        except Exception as exc:
+            self.parser_error = f"{type(exc).__name__}: {exc}"
             return None
 
     def _declarator_name_node(self, node):

@@ -18,7 +18,7 @@ class SemanticAgent:
                     candidate.semantic_explanation = llm_text or fallback
                     continue
                 except Exception as exc:
-                    candidate.semantic_explanation = f"{fallback} LLM semantic reasoning failed and template fallback was used: {exc}"
+                    candidate.semantic_explanation = f"{fallback} 大模型语义推理失败，已改用模板解释：{exc}"
                     continue
             candidate.semantic_explanation = fallback
         return candidates

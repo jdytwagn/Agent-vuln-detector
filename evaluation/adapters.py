@@ -7,6 +7,9 @@ import sys
 from pathlib import Path
 from typing import Any, Iterable
 
+from agents.preprocess_agent import PreprocessAgent
+from core.types import FunctionInfo, SourceFile
+
 
 C_CPP_EXTENSIONS = {".c", ".cc", ".cpp", ".cxx", ".h", ".hpp"}
 
@@ -20,7 +23,7 @@ def prepare_dataset(
 ) -> dict[str, Any]:
     normalized = dataset_type.lower()
     if normalized in {"juliet-c", "juliet-cpp", "juliet"}:
-        manifest = build_juliet_c_manifest(input_path, limit)
+        manifest = build_juliet_c_manifest(input_path, limit, materialize_dir=str(Path(materialize_dir) / "juliet"))
     elif normalized == "devign":
         manifest = build_function_dataset_manifest(
             dataset_name="Devign",
@@ -55,37 +58,105 @@ def prepare_dataset(
     return {"output": str(output.resolve()), "dataset": manifest["dataset"], "samples": len(manifest["samples"])}
 
 
-def build_juliet_c_manifest(input_path: str, limit: int | None = None) -> dict[str, Any]:
+def build_juliet_c_manifest(input_path: str, limit: int | None = None, materialize_dir: str | None = None) -> dict[str, Any]:
     root = Path(input_path).resolve()
     testcases = root / "testcases" if (root / "testcases").exists() else root
+    output_dir = Path(materialize_dir or "storage/datasets/materialized/juliet").resolve()
     samples: list[dict[str, Any]] = []
+    parser = PreprocessAgent()
     files = sorted(path for path in testcases.rglob("*") if path.is_file() and path.suffix.lower() in C_CPP_EXTENSIONS)
     for path in files:
         rel = path.relative_to(root)
         if "testcasesupport" in rel.parts:
             continue
-        cwe = next((part for part in rel.parts if part.startswith("CWE")), "")
-        name = path.stem.lower()
         content = path.read_text(encoding="utf-8", errors="ignore")
-        label = 1 if ("bad" in name or "bad(" in content or "badSink" in content) else 0
-        if "good" in name and "bad" not in name:
-            label = 0
-        samples.append(
-            {
-                "sample_id": str(rel).replace("\\", "/"),
-                "path": str(path),
-                "label": label,
-                "loc": _count_loc_text(content),
-                "cross_file": bool(re.search(r"_[a-e]$", path.stem)),
-                "exploitable": label == 1,
-                "non_exploitable": label == 0,
-                "cwe": cwe,
-                "project": "juliet-test-suite-c",
-            }
-        )
-        if limit and len(samples) >= limit:
-            break
+        cwe = next((part for part in rel.parts if part.startswith("CWE")), "")
+        emitted = _juliet_samples_for_file(path, rel, content, cwe, output_dir, parser)
+        for sample in emitted:
+            samples.append(sample)
+            if limit and len(samples) >= limit:
+                return {"dataset": "Juliet Test Suite C/C++", "source": str(root), "samples": samples}
     return {"dataset": "Juliet Test Suite C/C++", "source": str(root), "samples": samples}
+
+
+def _juliet_samples_for_file(
+    path: Path,
+    rel: Path,
+    content: str,
+    cwe: str,
+    output_dir: Path,
+    parser: PreprocessAgent,
+) -> list[dict[str, Any]]:
+    language = "cpp" if path.suffix.lower() in {".cc", ".cpp", ".cxx", ".hpp"} else "c"
+    functions = parser.run([SourceFile(str(path), language, content, content.splitlines())]).functions
+    bad = [function for function in functions if _is_bad_function(function.name)]
+    good = [function for function in functions if _is_good_function(function.name)]
+    helpers = [function for function in functions if function not in bad and function not in good]
+    sample_id = str(rel).replace("\\", "/")
+    cross_file = bool(re.search(r"_[a-e]$", path.stem))
+    if bad and good:
+        return [
+            _write_juliet_split(output_dir, sample_id, content, path.suffix, bad, helpers, 1, cwe, cross_file),
+            _write_juliet_split(output_dir, sample_id, content, path.suffix, good, helpers, 0, cwe, cross_file),
+        ]
+    label = 1 if bad else 0 if good else _fallback_juliet_label(content)
+    return [_juliet_record(sample_id, str(path), content, label, cwe, cross_file)]
+
+
+def _write_juliet_split(
+    output_dir: Path,
+    sample_id: str,
+    content: str,
+    suffix: str,
+    functions: list[FunctionInfo],
+    helpers: list[FunctionInfo],
+    label: int,
+    cwe: str,
+    cross_file: bool,
+) -> dict[str, Any]:
+    role = "bad" if label == 1 else "good"
+    safe_id = _safe_id(f"{sample_id}_{role}")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    destination = output_dir / f"{safe_id}{suffix}"
+    header = "\n".join(line for line in content.splitlines() if line.strip().startswith("#"))
+    bodies = "\n\n".join(function.code for function in [*helpers, *functions] if function.code.strip())
+    rendered = "\n\n".join(part for part in (header, bodies) if part)
+    destination.write_text(rendered + "\n", encoding="utf-8")
+    return _juliet_record(f"{sample_id}#{role}", str(destination), rendered, label, cwe, cross_file)
+
+
+def _juliet_record(sample_id: str, path: str, content: str, label: int, cwe: str, cross_file: bool) -> dict[str, Any]:
+    return {
+        "sample_id": sample_id,
+        "path": path,
+        "label": label,
+        "loc": _count_loc_text(content),
+        "cross_file": cross_file,
+        "exploitable": label == 1,
+        "non_exploitable": label == 0,
+        "cwe": cwe,
+        "project": "juliet-test-suite-c",
+    }
+
+
+def _fallback_juliet_label(content: str) -> int:
+    has_bad = bool(re.search(r"\bbad(?:Sink|Source)?\s*\(", content))
+    has_good = bool(re.search(r"\bgood\w*\s*\(", content))
+    if has_bad and not has_good:
+        return 1
+    return 0
+
+
+def _is_bad_function(name: str) -> bool:
+    lowered = name.lower()
+    return lowered in {"bad", "badsink", "badsource"} or lowered.endswith(("_bad", "badsink", "badsource")) or "_bad_" in lowered
+
+
+def _is_good_function(name: str) -> bool:
+    if _is_bad_function(name):
+        return False
+    lowered = name.lower()
+    return lowered == "good" or lowered.startswith("good") or lowered.endswith("_good") or "_good_" in lowered
 
 
 def build_function_dataset_manifest(

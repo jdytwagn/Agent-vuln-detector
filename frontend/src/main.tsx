@@ -78,13 +78,14 @@ function App() {
   }, [selectedScanId]);
 
   const dashboard = useMemo(() => {
-    const completed = scans.filter((scan) => scan.status === "completed").length;
+    const completed = scans.filter((scan) => scan.status === "completed" || scan.status === "completed_with_errors").length;
     const failed = scans.filter((scan) => scan.status === "failed").length;
     const reported = scans.reduce((sum, scan) => sum + Number(scan.summary_json?.reported_count ?? 0), 0);
-    const filtered = findings.filter((item) => item.final_decision === "filtered_false_positive").length;
+    const filtered = scans.reduce((sum, scan) => sum + Number(scan.summary_json?.filtered_count ?? 0), 0);
     return { completed, failed, reported, filtered };
-  }, [scans, findings]);
+  }, [scans]);
 
+  const selectedScan = scans.find((scan) => scan.id === selectedScanId);
   const effectiveModelPath = modelPath.trim() || MODEL_PATH_DEFAULTS[modelBackend] || "";
 
   const submitScan = async () => {
@@ -191,7 +192,7 @@ function App() {
             </section>
             <section className="panel">
               <h2>严重等级分布</h2>
-              <SeverityBars findings={findings} />
+              <SeverityBars findings={findings.filter((item) => item.final_decision !== "filtered_false_positive")} />
             </section>
           </section>
         )}
@@ -266,6 +267,13 @@ function App() {
                   <button onClick={() => api.downloadReport(selectedScanId, "md").catch((error) => setMessage(error.message))}>Markdown 报告</button>
                 </div>
               )}
+              {selectedScan?.error && <p className="error-text">{selectedScan.error}</p>}
+              {selectedScan?.summary_json?.model_fallback ? (
+                <div className="notice">模型未能加载，本次结果已降级为 mock：{String(selectedScan.summary_json.model_load_error ?? "")}</div>
+              ) : null}
+              {selectedScan?.summary_json?.parser_fallback ? (
+                <div className="notice">Tree-sitter 不可用，预处理已退回轻量解析：{String(selectedScan.summary_json.parser_error ?? "")}</div>
+              ) : null}
               <FindingList findings={findings} />
             </section>
           </section>
@@ -378,7 +386,11 @@ function TaskTable({ scans, selectedScanId, onSelect }: { scans: ScanTask[]; sel
         <button key={scan.id} className={`table-row ${selectedScanId === scan.id ? "selected" : ""}`} onClick={() => onSelect(scan.id)}>
           <span>{scan.source_path}</span>
           <StatusPill status={scan.status} />
-          <span>{String(scan.summary_json?.reported_count ?? "-")} findings</span>
+          <span>
+            {scan.status === "failed"
+              ? scan.error || "扫描失败"
+              : `${String(scan.summary_json?.reported_count ?? "-")} 条告警${Number(scan.summary_json?.filtered_count ?? 0) ? `，过滤 ${String(scan.summary_json?.filtered_count)}` : ""}`}
+          </span>
         </button>
       ))}
       {!scans.length && <p className="empty">暂无扫描任务。</p>}
@@ -407,10 +419,12 @@ function SeverityBars({ findings }: { findings: Finding[] }) {
 
 function FindingList({ findings }: { findings: Finding[] }) {
   if (!findings.length) return <p className="empty">当前任务暂无可展示漏洞。</p>;
+  const filteredCount = findings.filter((item) => item.final_decision === "filtered_false_positive").length;
   return (
     <div className="finding-list">
+      {filteredCount > 0 && <p className="empty">另有 {filteredCount} 条因缓解逻辑被过滤，仍保留在下方供核对，不计入报告漏洞。</p>}
       {findings.map((item) => (
-        <article className="finding" key={item.candidate_id}>
+        <article className={`finding${item.final_decision === "filtered_false_positive" ? " filtered" : ""}`} key={item.candidate_id}>
           <header>
             <div>
               <strong>{item.candidate_id} · {item.rule_evidence.name}</strong>
@@ -465,7 +479,7 @@ function EvaluationTable({ evaluations }: { evaluations: EvaluationTask[] }) {
               </div>
             ) : metrics ? (
               <div className="metric-line">
-                {["auc", "f1", "fpr", "alerts_per_kloc", "cross_file_recall", "exploitability_recall"].map((key) => (
+                {["auc", "f1", "fpr", "valid_ratio", "alerts_per_kloc", "cross_file_recall", "exploitability_recall"].map((key) => (
                   <span key={key}>{key}: {String(metrics[key])}</span>
                 ))}
               </div>
@@ -485,7 +499,7 @@ function MetricLine({ name, run }: { name: string; run: Record<string, unknown> 
     <div>
       <strong>{name}</strong>
       <div className="metric-line">
-        {["auc", "f1", "fpr", "alerts_per_kloc", "cross_file_recall", "exploitability_recall"].map((key) => (
+        {["auc", "f1", "fpr", "valid_ratio", "alerts_per_kloc", "cross_file_recall", "exploitability_recall"].map((key) => (
           <span key={key}>{key}: {String(metrics[key] ?? "-")}</span>
         ))}
       </div>

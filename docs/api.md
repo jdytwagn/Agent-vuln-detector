@@ -26,6 +26,9 @@
 - `model_backend` 支持 `mock`、`codebert`、`graphcodebert`。
 - 使用真实模型时，`model_path` 可以传本地模型目录，例如 `storage/models/codebert-devign-code-vulnerability-detector-git`。
 - `strict_model=true` 时，真实模型加载或推理失败会让任务失败，不会降级到 mock。
+- `strict_model=false` 且真实模型不可用时，任务可以完成，摘要里的 `model_fallback` 为 true。
+- `agent_chain` 不合法时接口直接返回 400，不会先创建一条随后失败的任务。
+- 上传非 C/C++ 且非 zip 的文件会返回 400。没有可扫描源码的路径会让任务失败，并在 `error` 中写明原因。
 - `agent_chain` 可以传智能体名称数组，例如 `["preprocess","rule_reasoning","fusion_decision"]`，用于消融实验；不传时使用完整默认链。
 - 出于安全考虑，API 路径扫描默认只允许扫描当前项目工作区内的路径。仅在可信本地环境中可设置 `AGENT_DETECTOR_ALLOW_ANY_PATH=true` 放开限制。
 - CORS 默认只允许本地前端 `http://127.0.0.1:5173` 和 `http://localhost:5173`。如需调整，可设置 `AGENT_DETECTOR_CORS_ORIGINS`，多个地址用英文逗号分隔。

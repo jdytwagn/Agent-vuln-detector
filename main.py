@@ -8,7 +8,7 @@ from core.config import ScanConfig
 from core.pipeline import VulnerabilityDetectionPipeline
 from backend.storage.repository import TaskRepository
 from evaluation.adapters import prepare_dataset
-from evaluation.baselines import DOCUMENT_BASELINES
+from evaluation.baselines import evaluation_payload
 from evaluation.evaluator import DatasetEvaluator
 from evaluation.gnn_baseline import GnnBaselineEvaluator
 from evaluation.graph_baseline import GraphFeatureBaseline
@@ -130,7 +130,7 @@ def main() -> int:
             return 2
         output = Path(args.output)
         output.parent.mkdir(parents=True, exist_ok=True)
-        payload = {"proposed_agent": metrics.to_dict(), "document_baselines": DOCUMENT_BASELINES}
+        payload = evaluation_payload(metrics.to_dict())
         output.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
         print(f"Evaluation metrics: {output.resolve()}")
         return 0
@@ -176,6 +176,12 @@ def main() -> int:
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
         print(f"Evaluation suite: {output.resolve()}")
+        for name, reason in result.get("skipped", {}).items():
+            print(f"Skipped {name}: {reason}")
+        if result.get("failed"):
+            for name, reason in result["failed"].items():
+                print(f"Failed {name}: {reason}")
+            return 2
         return 0
     if args.command == "prepare-dataset":
         try:

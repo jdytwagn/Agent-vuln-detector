@@ -3,7 +3,7 @@ const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 export type ScanTask = {
   id: string;
   source_path: string;
-  status: "pending" | "running" | "completed" | "failed";
+  status: "pending" | "running" | "completed" | "completed_with_errors" | "failed";
   model_backend: string;
   created_at: string;
   updated_at: string;
@@ -55,7 +55,7 @@ export type Rule = {
 export type EvaluationTask = {
   id: string;
   manifest_path: string;
-  status: "pending" | "running" | "completed" | "failed";
+  status: "pending" | "running" | "completed" | "completed_with_errors" | "failed";
   model_backend: string;
   metrics_json?: {
     proposed_agent?: Record<string, number | string>;

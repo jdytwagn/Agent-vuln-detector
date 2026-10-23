@@ -47,7 +47,7 @@
 
 | 数据集 | 当前状态 | Manifest | 说明 |
 | --- | --- | --- | --- |
-| Juliet C/C++ | 已下载并生成 1000 条 manifest | `storage/datasets/manifests/juliet_c_1000.json` | 标签来自 Juliet good/bad 命名和内容结构 |
+| Juliet C/C++ | 已下载并生成 1000 条 manifest | `storage/datasets/manifests/juliet_c_1000.json` | 适配器按函数名拆分 bad/good；旧 manifest 仍是当时的文件级标签，重新生成后正负数量会变化 |
 | Juliet Java / Find Security Bugs | 已下载，不进入当前 C/C++ 引擎评测 | 无正式 manifest | 需要 Java 解析器和 Java 规则库 |
 | Devign | 已下载、MD5 校验、生成 1000 条 manifest | `storage/datasets/manifests/devign_1000.json` | 当前最适合做模型分类评测 |
 | Big-Vul/MSR | 已下载并生成 1000 条正负配对 manifest | `storage/datasets/manifests/big_vul_1000.json` | 当前为 500 个漏洞样本 + 500 个修复后负样本；严格论文复现仍建议按 commit 还原完整函数 |
