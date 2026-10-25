@@ -80,9 +80,17 @@ function App() {
   const dashboard = useMemo(() => {
     const completed = scans.filter((scan) => scan.status === "completed" || scan.status === "completed_with_errors").length;
     const failed = scans.filter((scan) => scan.status === "failed").length;
-    const reported = scans.reduce((sum, scan) => sum + Number(scan.summary_json?.reported_count ?? 0), 0);
-    const filtered = scans.reduce((sum, scan) => sum + Number(scan.summary_json?.filtered_count ?? 0), 0);
-    return { completed, failed, reported, filtered };
+    const totals = scans.reduce(
+      (sum, scan) => {
+        const counts = splitCounts(scan);
+        sum.confirmed += counts.confirmed;
+        sum.review += counts.review;
+        sum.filtered += counts.filtered;
+        return sum;
+      },
+      { confirmed: 0, review: 0, filtered: 0 }
+    );
+    return { completed, failed, ...totals };
   }, [scans]);
 
   const selectedScan = scans.find((scan) => scan.id === selectedScanId);
@@ -180,19 +188,30 @@ function App() {
 
         {message && <div className="notice">{message}</div>}
 
+        <div className="tab-panel" key={tab}>
         {tab === "dashboard" && (
           <section className="content-grid">
             <MetricCard label="扫描任务" value={scans.length} />
             <MetricCard label="已完成" value={dashboard.completed} tone="success" />
-            <MetricCard label="报告漏洞" value={dashboard.reported} tone="danger" />
-            <MetricCard label="误报过滤" value={dashboard.filtered} tone="warning" />
+            <MetricCard label="确认漏洞" value={dashboard.confirmed} tone="danger" />
+            <MetricCard label="待复核" value={dashboard.review} tone="warning" />
+            <MetricCard label="误报过滤" value={dashboard.filtered} />
             <section className="panel wide">
               <h2>任务概览</h2>
               <TaskTable scans={scans} selectedScanId={selectedScanId} onSelect={selectScan} />
             </section>
             <section className="panel">
-              <h2>严重等级分布</h2>
+              <h2>当前任务严重等级</h2>
+              <p className="panel-note">{selectedScan?.source_path || "尚未选择任务"}。只统计该任务里未过滤的结果。</p>
               <SeverityBars findings={findings.filter((item) => item.final_decision !== "filtered_false_positive")} />
+            </section>
+            <section className="panel span-all">
+              <h2>判定链路</h2>
+              <ol className="pipeline">
+                {["预处理", "规则召回", "数据流", "模型打分", "语义解释", "可利用性", "融合判定"].map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
             </section>
           </section>
         )}
@@ -364,9 +383,45 @@ function App() {
             </section>
           </section>
         )}
+        </div>
       </section>
     </main>
   );
+}
+
+function splitCounts(scan: ScanTask) {
+  const summary = scan.summary_json ?? {};
+  if ("confirmed_count" in summary) {
+    return {
+      confirmed: Number(summary.confirmed_count ?? 0),
+      review: Number(summary.review_count ?? 0),
+      filtered: Number(summary.filtered_count ?? 0)
+    };
+  }
+  return {
+    confirmed: Number(summary.reported_count ?? 0),
+    review: 0,
+    filtered: Number(summary.filtered_count ?? 0)
+  };
+}
+
+function formatScanCounts(scan: ScanTask) {
+  const counts = splitCounts(scan);
+  const parts = [`确认 ${counts.confirmed}`];
+  if (counts.review) parts.push(`复核 ${counts.review}`);
+  if (counts.filtered) parts.push(`过滤 ${counts.filtered}`);
+  return parts.join("，");
+}
+
+function decisionLabel(decision: string) {
+  return (
+    {
+      vulnerable: "确认漏洞",
+      needs_review: "待复核",
+      filtered_false_positive: "误报过滤",
+      low_risk: "低风险"
+    } as Record<string, string>
+  )[decision] ?? decision;
 }
 
 function titleFor(tab: Tab) {
@@ -387,9 +442,7 @@ function TaskTable({ scans, selectedScanId, onSelect }: { scans: ScanTask[]; sel
           <span>{scan.source_path}</span>
           <StatusPill status={scan.status} />
           <span>
-            {scan.status === "failed"
-              ? scan.error || "扫描失败"
-              : `${String(scan.summary_json?.reported_count ?? "-")} 条告警${Number(scan.summary_json?.filtered_count ?? 0) ? `，过滤 ${String(scan.summary_json?.filtered_count)}` : ""}`}
+            {scan.status === "failed" ? scan.error || "扫描失败" : formatScanCounts(scan)}
           </span>
         </button>
       ))}
@@ -435,8 +488,9 @@ function FindingList({ findings }: { findings: Finding[] }) {
           <div className="finding-meta">
             <span>{item.rule_evidence.cwe}</span>
             <span>{item.rule_evidence.owasp}</span>
-            <span>{item.final_decision}</span>
-            <span>confidence {item.final_confidence}</span>
+            <span className={`decision decision-${item.final_decision}`}>{decisionLabel(item.final_decision)}</span>
+            <span>置信度 {item.final_confidence}</span>
+            {item.model_score ? <span>模型 {item.model_score.score}</span> : null}
           </div>
           <pre>{item.code}</pre>
           <p>{item.semantic_explanation}</p>

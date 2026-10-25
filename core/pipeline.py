@@ -87,6 +87,8 @@ class VulnerabilityDetectionPipeline:
         ir = self._require_ir(ir, "report_generation")
         visible = [item for item in candidates if item.final_confidence >= self.config.min_report_confidence]
         filtered = [item for item in visible if item.final_decision == "filtered_false_positive"]
+        confirmed = [item for item in visible if item.final_decision == "vulnerable"]
+        review = [item for item in visible if item.final_decision == "needs_review"]
         actionable = [item for item in visible if item.final_decision != "filtered_false_positive"]
         parser_fallback = self.config.parser_backend == "tree-sitter" and ir.parser_backend != "tree-sitter"
         summary = {
@@ -95,6 +97,8 @@ class VulnerabilityDetectionPipeline:
             "call_sites_discovered": len(ir.call_sites),
             "candidate_count": len(candidates),
             "reported_count": len(actionable),
+            "confirmed_count": len(confirmed),
+            "review_count": len(review),
             "filtered_count": len(filtered),
             "parser_backend": ir.parser_backend,
             "parser_fallback": parser_fallback,

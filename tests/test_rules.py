@@ -16,6 +16,24 @@ def test_rule_agent_finds_dangerous_sinks() -> None:
     assert report.summary["candidate_count"] >= 2
 
 
+def test_high_model_score_cannot_confirm_mitigated_sink(monkeypatch) -> None:
+    from core.types import ModelScore
+    from models.mock_scorer import MockScorer
+
+    def score(self, candidate):
+        return ModelScore(score=0.95, label="vulnerable", confidence=0.9, model_name="stub-high")
+
+    monkeypatch.setattr(MockScorer, "score", score)
+    report = VulnerabilityDetectionPipeline().run(str(SAMPLES / "mitigated.c"))
+    strcpy = next(item for item in report.vulnerabilities if item.sink == "strcpy")
+
+    assert strcpy.exploitability == "not_exploitable"
+    assert strcpy.final_decision == "needs_review"
+    assert report.summary["confirmed_count"] == 0
+    assert report.summary["review_count"] == 1
+    assert report.summary["filtered_count"] == 0
+
+
 def test_mitigated_case_is_filtered_or_lower_risk() -> None:
     report = VulnerabilityDetectionPipeline().run(str(SAMPLES / "mitigated.c"))
     strcpy = next(item for item in report.vulnerabilities if item.sink == "strcpy")
