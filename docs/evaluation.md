@@ -5,6 +5,12 @@
 - 传统分类指标：AUC、F1。
 - 工程级指标：FPR、Alerts/KLOC、Valid Ratio、Cross-file Recall、Exploitability Recall、Non-exploit Filter。
 
+`valid_ratio` 是样本级精确率：预测为漏洞的样本中，标签确实为漏洞的比例。它不再用告警条数做分母。多智能体评测的 `alerts_per_kloc` 只统计没有被过滤成 `filtered_false_positive` 的告警。
+
+`evaluation/sample_manifest.json` 的跨文件样本只指向 `tests/samples/cross_file`，避免把单文件正负样本再扫进同一次评测。`evaluate` 输出里的 `document_baselines` 是文档参考常数，并带有 `measured: false`，不是本次运行测得的结果。
+
+某个基线抛错时，`evaluate-suite` 以退出码 2 结束。缺少 PyTorch 时 GNN 记入 `skipped`，不让整次套件失败。
+
 ## 运行示例
 
 ```powershell

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 
+from agents.mitigations import has_unbounded_string_conversion, is_string_literal
 from core.types import CandidateVulnerability, CodebaseIR, Rule, RuleEvidence
 
 
@@ -37,6 +38,7 @@ class RuleAgent:
                         description=rule.description,
                         recommendation=rule.recommendation,
                         matched_text=self._matched_text(call.code, call.callee),
+                        filters=list(rule.filters),
                         tags=rule.tags,
                     ),
                 )
@@ -54,9 +56,18 @@ class RuleAgent:
         arguments: list[str],
     ) -> bool:
         first_argument = arguments[0].strip() if arguments else ""
-        is_literal = bool(re.match(r'^(?:u8|u|U|L)?["\']', first_argument))
-        if sink in {"printf", "system", "popen", "fopen"} and is_literal:
+        if sink in {"printf", "system", "popen", "fopen"} and is_string_literal(first_argument):
             return False
+        if sink in {"strcpy", "strcat"} and len(arguments) >= 2 and is_string_literal(arguments[1]):
+            return False
+        if sink == "sprintf" and len(arguments) >= 2 and all(is_string_literal(argument) for argument in arguments[1:]):
+            return False
+        if sink == "scanf":
+            return bool(arguments) and has_unbounded_string_conversion(arguments[0])
+        if sink in {"memcpy", "memmove"}:
+            if len(arguments) < 3 or re.search(r"\bsizeof\s*\(", arguments[2]):
+                return False
+            return True
 
         function = next(
             (item for item in ir.functions if item.file_path == file_path and item.name == function_name),

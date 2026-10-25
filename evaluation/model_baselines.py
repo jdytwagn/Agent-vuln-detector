@@ -71,7 +71,6 @@ class ModelBaselineEvaluator:
             predictions=predictions,
             alerts=alerts,
             total_loc=sum(samples[index].loc or self._count_loc(samples[index].path) for index in evaluation_indices),
-            valid_findings=sum(1 for label, pred in zip(eval_labels, predictions) if label == 1 and pred == 1),
             cross_file_mask=eval_cross_file,
             exploitable_mask=eval_exploitable,
             non_exploit_mask=eval_non_exploit,

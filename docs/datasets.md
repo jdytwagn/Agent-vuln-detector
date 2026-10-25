@@ -26,7 +26,7 @@ storage/datasets/
 
 | 数据集 | Manifest | 样本数 | 正样本 | 负样本 | 说明 |
 | --- | --- | ---: | ---: | ---: | --- |
-| Juliet C/C++ | `storage/datasets/manifests/juliet_c_1000.json` | 1000 | 892 | 108 | 从 `testcases` 下抽取 C/C++ 文件，按文件名和 Juliet good/bad 结构生成标签 |
+| Juliet C/C++ | `storage/datasets/manifests/juliet_c_1000.json` | 1000 | 以重新生成为准 | 以重新生成为准 | 同一文件里同时存在 bad/good 函数时会拆成两条样本；只按文件名含 good 不再把含 `bad()` 的文件标成负样本 |
 | Devign | `storage/datasets/manifests/devign_1000.json` | 1000 | 487 | 513 | 从 Zenodo 的 `data_C_Devign_test.csv` 抽取函数代码并物化为本地 `.c` 文件 |
 | Big-Vul/MSR | `storage/datasets/manifests/big_vul_1000.json` | 1000 | 500 | 500 | 已重新生成正负配对 manifest；漏洞样本来自修复前函数，负样本来自修复后函数或 patch 新增行 |
 

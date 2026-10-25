@@ -90,6 +90,23 @@ def test_dataset_api_paths_are_restricted_to_workspace(tmp_path: Path, monkeypat
         resolve_api_path(str(workspace_file), workspace_root=Path.cwd() / "storage" / "datasets")
 
 
+def test_api_rejects_invalid_agent_chain_before_running() -> None:
+    client = TestClient(app)
+    response = client.post("/api/scans", json={"source_path": "tests/samples", "agent_chain": ["fusion_decision", "preprocess"]})
+
+    assert response.status_code == 400
+    assert "preprocess" in response.json()["detail"]
+
+
+def test_upload_rejects_non_source_file(tmp_path: Path) -> None:
+    del tmp_path
+    client = TestClient(app)
+    response = client.post("/api/scans/upload", files={"file": ("notes.txt", b"hello", "text/plain")})
+
+    assert response.status_code == 400
+    assert "不支持的上传文件" in response.json()["detail"]
+
+
 def test_streaming_upload_rejects_limit_without_retaining_file(tmp_path: Path) -> None:
     service = _service(tmp_path)
     service.MAX_UPLOAD_BYTES = 8

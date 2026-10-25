@@ -10,7 +10,7 @@ from models.scorer import VulnerabilityScorer
 class MockScorer(VulnerabilityScorer):
     """Deterministic stand-in for CodeBERT/GraphCodeBERT style probability scoring."""
 
-    HIGH_RISK_SINKS = {"gets", "system", "popen", "strcpy", "strcat", "sprintf"}
+    HIGH_RISK_SINKS = {"gets", "scanf", "system", "popen", "strcpy", "strcat", "sprintf", "memcpy", "memmove"}
 
     def __init__(self, model_name: str = "mock-code-model") -> None:
         self.model_name = model_name

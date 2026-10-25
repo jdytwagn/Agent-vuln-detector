@@ -31,6 +31,9 @@ class SourceScanner:
         root = Path(source_path).resolve()
         if not root.exists():
             raise FileNotFoundError(f"Source path does not exist: {source_path}")
+        if root.is_file() and root.suffix.lower() not in SUPPORTED_EXTENSIONS:
+            supported = ", ".join(sorted(SUPPORTED_EXTENSIONS))
+            raise ValueError(f"不支持的源码类型：{root.name}。支持的扩展名：{supported}")
 
         paths = [root] if root.is_file() else self._walk(root)
         if len(paths) > self.max_files:
@@ -64,6 +67,9 @@ class SourceScanner:
                     lines=content.splitlines(),
                 )
             )
+        if not files:
+            supported = ", ".join(sorted(SUPPORTED_EXTENSIONS))
+            raise ValueError(f"没有找到可扫描的 C/C++ 源码。支持的扩展名：{supported}")
         return files
 
     def _walk(self, root: Path) -> list[Path]:

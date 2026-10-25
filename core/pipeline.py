@@ -14,13 +14,30 @@ from models.factory import build_scorer
 from rules.rule_loader import load_rules
 
 
-class VulnerabilityDetectionPipeline:
-    REQUIRED_ORDER = {name: index for index, name in enumerate(DEFAULT_AGENT_CHAIN)}
+def validate_agent_chain(agent_chain: tuple[str, ...] | list[str]) -> None:
+    chain = tuple(agent_chain)
+    required = {name: index for index, name in enumerate(DEFAULT_AGENT_CHAIN)}
+    unknown = [name for name in chain if name not in required]
+    if unknown:
+        raise ValueError(f"Unknown agent(s) in chain: {', '.join(unknown)}")
+    if not chain or chain[0] != "preprocess":
+        raise ValueError("Agent chain must start with preprocess")
+    if "rule_reasoning" not in chain:
+        raise ValueError("Agent chain must include rule_reasoning")
+    if "fusion_decision" not in chain:
+        raise ValueError("Agent chain must include fusion_decision")
+    if len(set(chain)) != len(chain):
+        raise ValueError("Agent chain contains duplicate agents")
+    positions = [required[name] for name in chain]
+    if positions != sorted(positions):
+        raise ValueError("Agent chain order must follow the documented detection flow")
 
+
+class VulnerabilityDetectionPipeline:
     def __init__(self, config: ScanConfig | None = None) -> None:
         self.config = config or ScanConfig()
         self.agent_chain = tuple(self.config.agent_chain or DEFAULT_AGENT_CHAIN)
-        self._validate_agent_chain(self.agent_chain)
+        validate_agent_chain(self.agent_chain)
         rules = load_rules(self.config.rules_path)
         self.scanner = SourceScanner(
             max_files=self.config.max_scan_files,
@@ -68,26 +85,38 @@ class VulnerabilityDetectionPipeline:
                 candidates = self.fusion_agent.run(candidates)
             executed_agents.append(agent_name)
         ir = self._require_ir(ir, "report_generation")
-        reported = [item for item in candidates if item.final_confidence >= self.config.min_report_confidence]
+        visible = [item for item in candidates if item.final_confidence >= self.config.min_report_confidence]
+        filtered = [item for item in visible if item.final_decision == "filtered_false_positive"]
+        confirmed = [item for item in visible if item.final_decision == "vulnerable"]
+        review = [item for item in visible if item.final_decision == "needs_review"]
+        actionable = [item for item in visible if item.final_decision != "filtered_false_positive"]
+        parser_fallback = self.config.parser_backend == "tree-sitter" and ir.parser_backend != "tree-sitter"
+        summary = {
+            "files_scanned": len(files),
+            "functions_discovered": len(ir.functions),
+            "call_sites_discovered": len(ir.call_sites),
+            "candidate_count": len(candidates),
+            "reported_count": len(actionable),
+            "confirmed_count": len(confirmed),
+            "review_count": len(review),
+            "filtered_count": len(filtered),
+            "parser_backend": ir.parser_backend,
+            "parser_fallback": parser_fallback,
+            "parser_error": self.preprocess_agent.parser_error if parser_fallback else None,
+            "ast_nodes": len(ir.ast_nodes),
+            "call_edges": len(ir.call_edges),
+            "variable_refs": len(ir.variable_refs),
+            "source_sink_nodes": len(ir.source_sink_nodes),
+            "cfg_nodes": len(ir.cfg_nodes),
+            "cfg_edges": len(ir.cfg_edges),
+            "dfg_edges": len(ir.dfg_edges),
+            "executed_agents": executed_agents,
+            **self._model_runtime_metadata(),
+        }
         return ScanReport(
             source_path=source_path,
-            summary={
-                "files_scanned": len(files),
-                "functions_discovered": len(ir.functions),
-                "call_sites_discovered": len(ir.call_sites),
-                "candidate_count": len(candidates),
-                "reported_count": len(reported),
-                "parser_backend": ir.parser_backend,
-                "ast_nodes": len(ir.ast_nodes),
-                "call_edges": len(ir.call_edges),
-                "variable_refs": len(ir.variable_refs),
-                "source_sink_nodes": len(ir.source_sink_nodes),
-                "cfg_nodes": len(ir.cfg_nodes),
-                "cfg_edges": len(ir.cfg_edges),
-                "dfg_edges": len(ir.dfg_edges),
-                "executed_agents": executed_agents,
-            },
-            vulnerabilities=reported,
+            summary=summary,
+            vulnerabilities=visible,
             engine={
                 "agents": executed_agents,
                 "model_backend": self.config.model_backend,
@@ -110,20 +139,6 @@ class VulnerabilityDetectionPipeline:
             "model_fallback": fallback,
             "model_load_error": getattr(scorer, "load_error", None),
         }
-
-    def _validate_agent_chain(self, agent_chain: tuple[str, ...]) -> None:
-        unknown = [name for name in agent_chain if name not in self.REQUIRED_ORDER]
-        if unknown:
-            raise ValueError(f"Unknown agent(s) in chain: {', '.join(unknown)}")
-        if not agent_chain or agent_chain[0] != "preprocess":
-            raise ValueError("Agent chain must start with preprocess")
-        if "rule_reasoning" not in agent_chain:
-            raise ValueError("Agent chain must include rule_reasoning")
-        if "fusion_decision" not in agent_chain:
-            raise ValueError("Agent chain must include fusion_decision")
-        positions = [self.REQUIRED_ORDER[name] for name in agent_chain]
-        if positions != sorted(positions):
-            raise ValueError("Agent chain order must follow the documented detection flow")
 
     def _require_ir(self, ir: CodebaseIR | None, agent_name: str) -> CodebaseIR:
         if ir is None:

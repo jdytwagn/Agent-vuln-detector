@@ -1,481 +1,217 @@
-# Agent Vulnerability Detector
+<p align="center">
+  <a href="README.md"><b>中文</b></a> · <a href="README.en.md">English</a>
+</p>
 
-多智能体代码漏洞检测平台，面向 C/C++ 源码扫描、漏洞证据链生成和实验评测。项目实现思路来自《基于智能体的代码漏洞检测框架研究》，核心目标不是训练一个单一分类器，而是构建“规则 + 模型 + 数据流 + 语义推理 + 可利用性验证 + 融合决策”的协同检测框架。
+<h1 align="center">🔍 Agent Vulnerability Detection — Fusion Guard</h1>
 
-## 功能特性
+<p align="center">
+  <img alt="python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white">
+  <img alt="PyTorch optional" src="https://img.shields.io/badge/PyTorch-optional-EE4C2C?style=flat-square&logo=pytorch&logoColor=white">
+  <img alt="license MIT" src="https://img.shields.io/badge/license-MIT-22A06B?style=flat-square">
+  <img alt="backbone CodeBERT" src="https://img.shields.io/badge/Backbone-CodeBERT%20%2F%20GraphCodeBERT-0E7C73?style=flat-square">
+  <img alt="seven agents" src="https://img.shields.io/badge/Agents-7-3E5175?style=flat-square">
+  <img alt="three dataset adapters" src="https://img.shields.io/badge/Datasets-3-B4690E?style=flat-square">
+</p>
 
-- 支持 CLI、FastAPI 后端和 Web 前端三种使用方式。
-- 支持扫描单个 C/C++ 文件或源码目录。
-- 支持上传 `.zip`、`.c`、`.cc`、`.cpp`、`.cxx`、`.h`、`.hpp` 文件。
-- 支持 JSON 和 Markdown 漏洞报告。
-- 支持 CWE/OWASP 规则库初筛。
-- 支持 mock、CodeBERT、GraphCodeBERT 三类模型打分后端。
-- 支持严格模型模式，避免真实模型加载失败后静默降级为 mock。
-- 支持 DeepSeek API 语义推理，未配置时自动降级为模板解释。
-- 支持函数内、跨函数、跨文件的轻量 source-to-sink 分析。
-- 支持可配置智能体链，便于做消融实验。
-- 支持 SQLite 保存扫描任务和评测任务状态。
-- 支持 Juliet C/C++、Devign、Big-Vul/MSR 数据集适配为统一 manifest。
-- 支持 AUC、F1、FPR、Alerts/KLOC、Valid Ratio、Cross-file Recall、Exploitability Recall 等评测指标。
-- 支持 CodeBERT、GraphCodeBERT、图特征 baseline 和轻量 GNN baseline 对比。
+<p align="center"><b>基于规则、数据流与 CodeBERT 的 C/C++ 漏洞检测控制台</b></p>
 
-## 检测流程
+<p align="center"><i>七步顺序判定 · 局部缓解不被模型分覆盖 · 白底叠卡控制台 · Devign 小样本实测</i></p>
 
-```text
-源码输入
-  -> 代码预处理
-  -> 规则初筛
-  -> 数据流验证
-  -> 深度学习打分
-  -> 语义推理
-  -> 可利用性判断
-  -> 融合决策
-  -> 输出漏洞报告
+<p align="center">
+  <a href="#设计架构">📐 设计架构</a>
+  ·
+  <a href="#快速开始">🚀 快速开始</a>
+  ·
+  <a href="#实验结果">📊 实验结果</a>
+  ·
+  <a href="#界面实现">🧊 界面实现</a>
+</p>
+
+项目实现思路来自《基于智能体的代码漏洞检测框架研究》。它不把漏洞检测做成单个分类器，而是让规则、数据流、代码模型、语义说明、可利用性验证和融合决策按固定顺序交出同一条证据链。维护者是 [jdytwagn](https://github.com/jdytwagn)。
+
+## 设计架构
+
+系统分成四层。React 控制台只读当前工作区里的真实任务；FastAPI 负责任务、上传和报告；检测引擎按顺序跑七个智能体；评测层用同一份 manifest 比较智能体流水线和模型基线。
+
+```mermaid
+flowchart LR
+  UI["React 控制台"] --> API["FastAPI"]
+  API --> Engine["七步检测引擎"]
+  API --> Eval["评测"]
+  Engine --> DB["SQLite 任务库"]
+  Eval --> DB
+  Engine --> Report["JSON / Markdown 报告"]
 ```
 
-七个智能体默认按以下顺序执行：
+默认链路是一条顺序流水线，不是互相辩论的自由多智能体：
 
-| 智能体 | 作用 | 代码位置 |
+```text
+源码 → 预处理 → 规则召回 → 数据流 → 模型打分 → 语义解释 → 可利用性 → 融合判定
+```
+
+| 步骤 | 智能体 | 做什么 |
 | --- | --- | --- |
-| 预处理智能体 | 提取函数、调用点、AST 摘要、调用边、变量引用、source/sink 节点 | `agents/preprocess_agent.py` |
-| 规则推理智能体 | 基于 CWE/OWASP 规则发现候选漏洞 | `agents/rule_agent.py` |
-| 数据流分析智能体 | 追踪 source-to-sink 路径 | `agents/dataflow_agent.py` |
-| 深度学习打分智能体 | 结合代码片段和数据流特征输出概率分数 | `agents/model_score_agent.py` |
-| 语义推理智能体 | 生成中文漏洞解释 | `agents/semantic_agent.py` |
-| 可利用性验证智能体 | 判断输入可控性、路径可达性和缓解逻辑 | `agents/exploitability_agent.py` |
-| 融合决策智能体 | 综合多源证据输出最终置信度和风险等级 | `agents/fusion_agent.py` |
+| 01 | 预处理 | Tree-sitter 提取函数、调用、轻量 CFG/DFG、source/sink |
+| 02 | 规则召回 | 用 CWE/OWASP 规则产生候选，模型不能自己发明候选 |
+| 03 | 数据流 | 在函数文本和调用边上追踪 source 到 sink |
+| 04 | 模型打分 | 只给规则命中打分，后端为 mock、CodeBERT 或 GraphCodeBERT |
+| 05 | 语义解释 | 生成中文说明；未配置 DeepSeek 时使用模板 |
+| 06 | 可利用性 | 看输入是否可控、路径是否连通、局部是否已有缓解 |
+| 07 | 融合判定 | 汇总证据。局部缓解不会被高模型分改判成漏洞 |
 
-## 系统架构
+融合规则写在 `agents/fusion_agent.py`。已经看到边界检查、校验或更安全接口时，可利用性保持 `not_exploitable`。此时模型分达到 0.65 只进入 `needs_review`，低于 0.65 记为 `filtered_false_positive`。证据不完整时同样进入复核，而不是直接确认。
 
-```text
-agent-vuln-detector/
-  agents/          # 七个智能体
-  backend/         # FastAPI 后端服务
-  core/            # 核心数据结构、扫描器、流水线、配置
-  docs/            # 中文文档
-  evaluation/      # 数据集评测、指标计算和 baseline
-  frontend/        # React + TypeScript + Vite 前端
-  models/          # mock / CodeBERT / GraphCodeBERT / DeepSeek 接口
-  reports/         # JSON / Markdown 报告生成
-  rules/           # CWE/OWASP 规则库
-  scripts/         # 本地启动脚本
-  tests/           # 测试样例和自动化测试
-  main.py          # CLI 入口
-```
+## 整体思路
 
-四层结构：
+检测分成“谁有资格成为候选”和“这条候选能不能确认”两件事。
 
-- 检测引擎层：`agents/`、`core/`、`rules/`、`models/`、`reports/`
-- 后端服务层：`backend/`
-- 前端展示层：`frontend/`
-- 实验评测层：`evaluation/`
+规则库先召回危险汇，例如 `memcpy`、`popen`、`free`。数据流再看污点有没有到这个汇。代码模型只给这些已经召回的函数打一个 0 到 1 的分，不能在规则沉默时凭空报警。语义层把证据写成可读说明。可利用性层负责否决已经被局部缓解的命中。融合层最后给出 `vulnerable`、`needs_review` 或过滤结果，并分开计数。
 
-## 环境要求
+这样做是为了让一次告警能够回到规则、路径和模型分，而不是只剩一个概率。代价也很明确：规则没召回的漏洞，后面的模型看不到。随机函数上的漏报会直接体现在 F1 上，下面的实测保留了这个结果。
 
-- Python `>= 3.10`
-- Node.js 和 npm
-- Git
-- 可选：Docker / Docker Compose
-- 可选：支持真实模型推理的 PyTorch 环境
+## 设计思想
 
-Python 基础依赖见 [pyproject.toml](pyproject.toml)，前端依赖见 [frontend/package.json](frontend/package.json)。
+- 证据优先于分数。模型分参与置信度，但不能单方面覆盖局部缓解。
+- 复核是一种结果，不是失败状态。路径不完整或证据互相矛盾时停在人工复核。
+- 控制台绑定当前 SQLite 任务。扫描数、确认数和评测指标都来自这次运行，不写死集群、人员和 GPU。
+- 界面是白底亮色。导航、顶栏、指标、任务和链路各自是一层白色卡片。
 
-## 五分钟快速开始
+## 界面实现
 
-### 1. 克隆项目
+控制台是白底。页面底色 `#F4F7FB`，导航、顶栏、指标、任务概览、严重等级和七步链路都是分开的白卡片。指标卡和规则卡再抬高一层，顶边有一条淡蓝高光，数字落在浅灰下凹槽里。当前导航项用 `#4C8DFF` 描边。样式在 `frontend/src/styles/app.css`。
 
-```powershell
-git clone https://github.com/jdytwagn/agent-vuln-detector.git
-cd agent-vuln-detector
-```
+<p align="center">
+  <img alt="白底安全扫描仪表盘" src="docs/figures/dashboard-hover.jpg" width="920">
+</p>
 
-### 2. 创建虚拟环境并安装 Python 依赖
+<p align="center"><i>仪表盘。扫描数、确认数和严重等级都来自当前工作区里的真实任务。</i></p>
 
-Windows PowerShell：
+<p align="center">
+  <img alt="白底规则库，每条 CWE 规则是一张抬升卡" src="docs/figures/rules-hover.jpg" width="920">
+</p>
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -e ".[test]"
-```
+<p align="center"><i>规则库。每条 CWE 规则是一张独立的抬升卡。</i></p>
 
-Linux / macOS：
+## 实验结果
+
+下面两组数都来自 2026-10-25 的同一次本地运行。模型是已加载的 CodeBERT，严格模式，`model_fallback` 为 false，语义层没有调用 DeepSeek。环境是 CPU，PyTorch 2.14.1，`torch.cuda.is_available()` 为 false。原始 CSV 和权重在 `storage/`，不进入仓库。
+
+### 含危险汇的四条 Devign 函数
+
+从 Devign 的 C 语言测试 CSV `data_C_Devign_test.csv` 中取出 4 个标签为漏洞的函数，分别来自 QEMU（248、304、921）和 FFmpeg（1804），放到目录里用 CodeBERT 严格模式扫描。任务 `f225fa44-fcd4-43ee-a935-b76c177e0dfe` 约 8 秒完成。
+
+| 项目 | 结果 |
+| --- | --- |
+| 文件 / 函数 / 调用点 | 4 / 5 / 42 |
+| 候选 | 5 |
+| 确认 / 复核 / 过滤 | 4 / 1 / 0 |
+| 解析器 | tree-sitter，没有回退 |
+| 数据流边 | 251 |
+| 执行链 | 预处理到融合判定，七步都跑了 |
+
+| 编号 | 位置 | 汇 | CWE | 模型分 | 置信度 | 判定 |
+| --- | --- | --- | --- | --- | --- | --- |
+| VULN-0001 | `FFmpeg_1804.c:109` `ptx_decode_frame` | memcpy | CWE-120 | 0.229 | 0.905 | 确认，critical |
+| VULN-0002 | `qemu_248.c:29` `usbredir_bulk_packet` | free | CWE-416 | 0.943 | 0.990 | 确认，critical |
+| VULN-0003 | `qemu_248.c:59` `usbredir_bulk_packet` | memcpy | CWE-120 | 0.523 | 0.990 | 确认，critical |
+| VULN-0004 | `qemu_304.c:29` `header_ext_add` | memcpy | CWE-120 | 0.067 | 0.848 | 确认，high |
+| VULN-0005 | `qemu_921.c:28` `dataset_function` | popen | CWE-78 | 0.857 | 0.825 | 复核，high |
+
+`popen` 的模型分是 0.857，但轻量数据流没有找到 source 到 sink 的路径，可利用性为 `uncertain`，所以融合结果停在复核。FFmpeg 的 `memcpy` 模型分只有 0.229，数据流能指出污点步，可利用性为 `exploitable`，因此仍然确认。这就是“高分不能单独定罪，低分也不能单独洗掉已连通的危险汇”。
+
+<p align="center">
+  <img alt="qemu_921.c 的 popen 被标为待复核" src="docs/figures/findings-popen.jpg" width="920">
+</p>
+
+<p align="center"><i>qemu_921.c 的 popen。模型分 0.857，判定仍是待复核。</i></p>
+
+<p align="center">
+  <img alt="FFmpeg memcpy 被确认为严重漏洞并展示污点步" src="docs/figures/findings-memcpy.jpg" width="920">
+</p>
+
+<p align="center"><i>FFmpeg_1804.c 的 memcpy。模型分 0.229，证据链足够，判定为确认。</i></p>
+
+截图当时的控制台累计的是本机工作区，不是一套公开排行榜：扫描任务 3，已完成 2，确认漏洞 7，待复核 2，误报过滤 0。其中包含上面这次 Devign 扫描、更早的 `tests/samples` 扫描，以及一次 `notes.txt` 上传失败。失败原因是文件不是 C/C++ 源码或 zip，页面上保留了这句错误。
+
+### 十六条均衡切片
+
+另一组从同一份 CSV 抽出 16 个函数，漏洞和正常各 8 个，项目为 QEMU 13 个、FFmpeg 3 个。智能体评测任务 `17b540c8-4fcc-4c59-a03d-ab10f93ae5da` 的结果是：
+
+| 指标 | 智能体流水线 |
+| --- | --- |
+| 样本 | 16 |
+| AUC | 0.5 |
+| F1 | 0 |
+| FPR | 0 |
+| Alerts/KLOC | 0 |
+
+规则没有命中这 16 个函数，流水线因此没有告警。模型只给规则命中打分，所以它没有机会把这些函数补成漏洞。AUC 0.5 和 F1 0 是这次切片的真实结果，不是纸面基线。
+
+<p align="center">
+  <img alt="效能评测页显示 Devign 切片 AUC 0.5、F1 0" src="docs/figures/evaluation-devign.jpg" width="920">
+</p>
+
+同一 manifest 上另跑的纯 CodeBERT 基线不经过规则召回。校准集 4 条、评估集 12 条，划分种子 7，两组没有重叠。校准阈值是 0.0。评估集结果：
+
+| 指标 | CodeBERT 基线 |
+| --- | --- |
+| 样本 | 12 |
+| AUC | 0.8333 |
+| F1 | 0.6667 |
+| FPR | 1.0 |
+| Alerts/KLOC | 47.4308 |
+| Valid Ratio | 0.5 |
+| 阈值 | 0.0 |
+
+阈值 0.0 再按 `score >= threshold` 判定，评估样本全部落在正例一侧，所以 FPR 是 1.0。这是 16 条切片上的小样本结果，不能当成 Devign 全量论文数字。报告 JSON 里另有一份 `measured: false` 的文档常数，本页不引用那些数。
+
+## 快速开始
+
+Python 3.10 以上。基础安装可以跑规则、Tree-sitter、数据流、报告、CLI 和后端，不必先下载模型权重。
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install --upgrade pip
 python -m pip install -e ".[test]"
-```
-
-基础安装已经可以运行完整规则、Tree-sitter、数据流、报告、CLI 和 Web 后端，不要求模型权重或 API Key。
-
-如果要运行 CodeBERT、GraphCodeBERT 或 GNN baseline，再安装模型依赖：
-
-```powershell
-python -m pip install -e ".[model,test]"
-```
-
-验证安装：
-
-```powershell
 python main.py scan tests/samples --output out/report.json --markdown out/report.md
 ```
 
-### 3. 安装前端依赖
-
-```powershell
-cd frontend
-npm ci
-cd ..
-```
-
-### 4. 启动后端和前端
-
-一键启动：
-
-```powershell
-.\scripts\start_all.ps1
-```
-
-Linux / macOS 请分别启动两个终端：
+需要 CodeBERT、GraphCodeBERT 或 GNN 基线时再安装 `.[model,test]`。前端：
 
 ```bash
-python -m backend.run
+cd frontend && npm ci && npm run dev
 ```
 
-```bash
-cd frontend
-npm run dev
-```
+另一个终端运行 `python -m backend.run`。控制台在 `http://127.0.0.1:5173`，健康检查在 `http://127.0.0.1:8000/api/health`。
 
-也可以分开启动：
+当前能力与代码的对应关系：
 
-```powershell
-python -m backend.run
-```
+- CLI 提供 `scan`、`evaluate`、`evaluate-baseline`、`evaluate-suite`、`prepare-dataset`、`migrate-db`。
+- 扫描 `.c`、`.cc`、`.cpp`、`.cxx`、`.h`、`.hpp`；前端也可上传这些后缀和 `.zip`。
+- 七个智能体的顺序可以配置。
+- 报告同时有 JSON 和 Markdown。
+- 模型后端是 mock、CodeBERT、GraphCodeBERT，支持严格模式。
+- DeepSeek 未配置或调用失败时，语义说明回退到模板。
+- 数据集适配器覆盖 Juliet、Devign 和 Big-Vul manifest。
+- 扫描和评测任务保存在 SQLite。
 
-```powershell
-cd frontend
-npm run dev
-```
+命令、接口、配置和 Docker 见 [docs/usage.md](docs/usage.md)。
 
-访问地址：
+## 当前边界
 
-- 前端：`http://127.0.0.1:5173`
-- 后端：`http://127.0.0.1:8000`
-- 健康检查：`http://127.0.0.1:8000/api/health`
+轻量 CFG/DFG 用来做特征和报告，不等同于 Clang/LLVM 可达性证明。函数参数默认按污点处理。没有本地缓解证据时，融合仍可能把危险汇确认下来。生产环境还缺认证、队列和资源隔离，见 [docs/production_readiness.md](docs/production_readiness.md)。
 
-## 使用方式
+## 文档
 
-### Web 前端
-
-打开：
-
-```text
-http://127.0.0.1:5173
-```
-
-推荐演示流程：
-
-1. 进入“扫描”页面。
-2. 点击“扫描内置样例”。
-3. 系统会扫描 `tests/samples`。
-4. 扫描提交后自动跳转到“漏洞详情”。
-5. 查看 CWE、文件位置、规则证据、模型分数、数据流路径、语义解释和修复建议。
-6. 下载 JSON 或 Markdown 报告。
-
-前端页面包括：
-
-- 仪表盘
-- 扫描任务
-- 漏洞详情
-- 规则库
-- 实验评测
-
-### CLI 扫描
-
-扫描内置样例：
-
-```powershell
-python main.py scan tests/samples --output out/report.json --markdown out/report.md
-```
-
-扫描自己的 C/C++ 项目：
-
-```powershell
-python main.py scan D:\your_cpp_project --output out/your_report.json --markdown out/your_report.md
-```
-
-使用完整智能体链：
-
-```powershell
-python main.py scan tests/samples --agent-chain preprocess,rule_reasoning,dataflow_analysis,model_scoring,semantic_reasoning,exploitability_validation,fusion_decision --output out/full_chain_report.json
-```
-
-只跑规则和融合，用于消融实验：
-
-```powershell
-python main.py scan tests/samples --agent-chain preprocess,rule_reasoning,fusion_decision --output out/rule_only_report.json
-```
-
-启用 DeepSeek 语义推理：
-
-```powershell
-python main.py scan tests/samples --enable-llm-semantics --output out/llm_report.json --markdown out/llm_report.md
-```
-
-### 真实模型扫描
-
-CodeBERT：
-
-```powershell
-python main.py scan tests/samples --model-backend codebert --model-path storage/models/codebert-devign-code-vulnerability-detector-git --strict-model --output out/codebert_report.json
-```
-
-GraphCodeBERT：
-
-```powershell
-python main.py scan tests/samples --model-backend graphcodebert --model-path storage/models/graphcodebert-devign-code-vulnerability-detector-git --strict-model --output out/graphcodebert_report.json
-```
-
-说明：
-
-- `--strict-model` 用于正式实验。开启后，如果真实模型加载失败，系统会直接报错。
-- 不开启 `--strict-model` 时，模型不可用会降级为 mock scorer，适合演示和离线联调。
-- 如果模型的 `id2label` 只有 `LABEL_0/LABEL_1` 而没有明确语义，请在 `.env` 中设置 `AGENT_DETECTOR_MODEL_POSITIVE_LABEL`，例如 `LABEL_1`；系统不会再盲猜正类方向。
-
-## 后端 API
-
-主要接口：
-
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| `GET` | `/api/health` | 健康检查 |
-| `POST` | `/api/scans` | 提交路径扫描任务 |
-| `POST` | `/api/scans/upload` | 上传源码或压缩包扫描 |
-| `GET` | `/api/scans` | 查看扫描任务列表 |
-| `GET` | `/api/scans/{id}` | 查看扫描任务状态 |
-| `GET` | `/api/scans/{id}/findings` | 查看漏洞详情 |
-| `GET` | `/api/scans/{id}/report` | 下载 JSON 或 Markdown 报告 |
-| `GET` | `/api/rules` | 查看规则库 |
-| `POST` | `/api/datasets/prepare` | 转换 Juliet、Devign、Big-Vul 数据集 |
-| `POST` | `/api/evaluations` | 启动评测任务 |
-| `GET` | `/api/evaluations` | 查看评测任务列表 |
-| `GET` | `/api/evaluations/{id}` | 查看评测结果 |
-
-完整接口说明见 [docs/api.md](docs/api.md)。
-
-## 数据集与评测
-
-项目支持统一 manifest 格式。manifest 用来描述数据集样本路径、标签和元数据。
-
-内置小样例评测：
-
-```powershell
-python main.py evaluate evaluation/sample_manifest.json --output out/evaluation.json
-```
-
-完整评测套件：
-
-```powershell
-python main.py evaluate-suite evaluation/sample_manifest.json --skip-code-models --gnn-epochs 1 --output out/evaluation_suite_sample.json
-```
-
-模型 baseline：
-
-```powershell
-python main.py evaluate-baseline evaluation/sample_manifest.json --backend codebert --model-path storage/models/codebert-devign-code-vulnerability-detector-git --strict-model --output out/codebert_baseline.json
-python main.py evaluate-baseline evaluation/sample_manifest.json --backend graphcodebert --model-path storage/models/graphcodebert-devign-code-vulnerability-detector-git --strict-model --output out/graphcodebert_baseline.json
-python main.py evaluate-baseline evaluation/sample_manifest.json --backend graph-feature --output out/graph_feature_baseline.json
-python main.py evaluate-baseline evaluation/sample_manifest.json --backend gnn --epochs 20 --output out/gnn_baseline.json
-```
-
-准备真实数据集 manifest：
-
-```powershell
-python main.py prepare-dataset juliet-c storage/datasets/raw/juliet-test-suite-c --output storage/datasets/manifests/juliet_c_1000.json --limit 1000
-python main.py prepare-dataset devign storage/datasets/raw/devign_zenodo/data_C_Devign_test.csv --output storage/datasets/manifests/devign_1000.json --materialize-dir storage/datasets/materialized --limit 1000
-python main.py prepare-dataset big-vul storage/datasets/raw/MSR_20_Code_vulnerability_CSV_Dataset/all_c_cpp_release2.0.csv --output storage/datasets/manifests/big_vul_1000.json --materialize-dir storage/datasets/materialized --limit 1000
-```
-
-数据集说明见 [docs/datasets.md](docs/datasets.md)，评测说明见 [docs/evaluation.md](docs/evaluation.md)。
-
-## 配置
-
-本地私密配置使用 `.env`，请不要提交真实 `.env`。
-
-复制示例文件：
-
-```powershell
-copy .env.example .env
-```
-
-常用环境变量：
-
-```env
-DEEPSEEK_API_KEY=
-DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_MODEL=deepseek-v4-flash
-AGENT_DETECTOR_MODEL_POSITIVE_LABEL=
-AGENT_DETECTOR_CORS_ORIGINS=http://127.0.0.1:5173,http://localhost:5173
-AGENT_DETECTOR_API_KEY=
-AGENT_DETECTOR_DB_PATH=storage/app.db
-```
-
-说明：
-
-- `DEEPSEEK_API_KEY`：可选。填写后配合 `--enable-llm-semantics` 启用 DeepSeek 语义解释；不填写时使用本地模板解释。
-- `DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`：模型服务地址和模型名，应以你的服务商控制台为准。
-- `AGENT_DETECTOR_MODEL_POSITIVE_LABEL`：仅当本地分类模型使用含糊的 `LABEL_0/LABEL_1` 时填写，例如 `LABEL_1`。
-- `AGENT_DETECTOR_API_KEY`：可选 API Key。设置后，除健康检查外的 API 需要 `X-API-Key` 或 `Authorization: Bearer <key>`。
-- `AGENT_DETECTOR_ALLOW_ANY_PATH=true`：允许 API 扫描工作区外路径。仅建议在可信本地环境使用。
-
-### 三种运行模式
-
-| 模式 | 需要配置 | 适用场景 |
-| --- | --- | --- |
-| 默认本地模式 | 无需 API、无需模型权重 | 首次运行、规则和数据流扫描、功能演示 |
-| LLM 语义模式 | `DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL` | 生成更丰富的中文漏洞解释 |
-| 真实代码模型模式 | 安装 `.[model]` 并提供本地目录或 Hugging Face 模型 ID | CodeBERT/GraphCodeBERT 正式实验 |
-
-模型权重、原始数据集和 `.env` 不会提交到 Git。用户拉取项目后只需安装依赖；如果需要 LLM 或真实代码模型，再按上述变量和命令配置即可。
-
-## 规则库
-
-规则文件位于 [rules/cwe_rules.yaml](rules/cwe_rules.yaml)，当前覆盖：
-
-| 类型 | 典型 API |
-| --- | --- |
-| 缓冲区复制 | `strcpy` |
-| 缓冲区拼接 | `strcat` |
-| 格式化输出 | `sprintf` |
-| 危险输入 | `gets` |
-| 命令执行 | `system`、`popen` |
-| 路径访问 | `fopen` |
-| 内存分配检查 | `malloc` |
-| Use-after-free 前置风险 | `free` |
-| 格式化字符串 | `printf` |
-
-## 报告格式
-
-每条漏洞结果包含：
-
-- CWE / OWASP 信息
-- 文件路径和行号
-- 命中的危险 sink
-- 规则证据
-- 模型分数
-- source-to-sink 数据流路径
-- 语义解释
-- 可利用性判断
-- 最终置信度和风险等级
-- 修复建议
-
-示例输出：
-
-```powershell
-python main.py scan tests/samples --output out/report.json --markdown out/report.md
-```
-
-## 测试
-
-运行全部测试：
-
-```powershell
-python -m pytest
-```
-
-前端构建检查：
-
-```powershell
-cd frontend
-npm run build
-```
-
-端到端快速检查：
-
-```powershell
-python main.py scan tests/samples --output out/report.json --markdown out/report.md
-python main.py evaluate evaluation/sample_manifest.json --output out/evaluation.json
-```
-
-初始化或迁移本地 SQLite 数据库：
-
-```powershell
-python main.py migrate-db
-```
-
-## Docker 部署
-
-本地 Docker Compose 启动：
-
-```powershell
-docker compose up --build
-```
-
-访问：
-
-- 前端：`http://127.0.0.1:5173`
-- 后端：`http://127.0.0.1:8000`
-
-详细部署说明见 [docs/deployment.md](docs/deployment.md)。
-
-## 安全说明
-
-本仓库默认不提交以下内容：
-
-- `.env`
-- `storage/`
-- `out/`
-- `frontend/node_modules/`
-- `frontend/dist/`
-- 模型权重
-- 原始数据集
-- 扫描报告输出
-
-提交前建议检查：
-
-```powershell
-git status
-git grep "sk-"
-git grep "API_KEY"
-git grep "TOKEN"
-```
-
-如果 API Key 曾经暴露，请立即到对应平台重置。
-
-## 文档索引
-
+- [使用说明](docs/usage.md)
 - [小白使用和设计说明](docs/beginner_guide.md)
 - [系统架构说明](docs/architecture.md)
-- [后端接口文档](docs/api.md)
-- [部署说明](docs/deployment.md)
-- [实验评测说明](docs/evaluation.md)
-- [真实模型接入说明](docs/models.md)
-- [本地数据集说明](docs/datasets.md)
-- [文档对齐矩阵](docs/document_alignment.md)
-- [任务完成度审计](docs/task_completion_audit.md)
-- [生产环境缺口清单](docs/production_readiness.md)
-
-## 当前限制
-
-- 当前预处理使用 Tree-sitter 提取函数、参数和调用，并构建轻量 CFG/DFG，尚不是 Clang/LLVM 级精确分析。
-- 当前数据流是轻量 source-to-sink 分析，仍缺少完整指针别名、结构体字段和复杂控制流证明。
-- 当前 GNN baseline 是项目内置轻量 GCN，不是完整 Devign/Joern CPG 复现。
-- 当前后端任务使用 FastAPI BackgroundTasks，生产环境建议替换为 Redis/Celery/RQ。
-- 当前数据库默认 SQLite，生产环境建议替换为 PostgreSQL/MySQL 并接入正式迁移工具。
-
-## 路线图
-
-- 使用 Clang/LLVM 增强宏展开、类型解析和编译单元级分析。
-- 增强跨文件调用图、def-use、alias 和指针分析。
-- 增加更完整的 CPG/Joern 风格 GNN baseline。
-- 跑完 Devign、Juliet、Big-Vul 子集的正式评测并保存阈值校准结果。
-- 引入正式认证、项目空间隔离、任务队列、资源限制和监控。
-- 增加 CI/CD、发布镜像和生产部署配置。
+- [后端接口](docs/api.md)
+- [模型接入](docs/models.md)
+- [数据集](docs/datasets.md)
+- [评测](docs/evaluation.md)
+- [部署](docs/deployment.md)
 
 ## License
 
-本项目采用 [MIT License](LICENSE) 开源。你可以在保留版权与许可声明的前提下使用、复制、修改和分发本项目，完整条款请参阅 `LICENSE` 文件。
+本项目采用 [MIT License](LICENSE)。

@@ -2,22 +2,24 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from core.config import ScanConfig
-from core.pipeline import VulnerabilityDetectionPipeline
+from agents.preprocess_agent import PreprocessAgent
+from core.scanner import SourceScanner
+from core.types import CodebaseIR
 from evaluation.dataset import load_manifest
 from evaluation.metrics import compute_metrics
 
 
 class GraphFeatureBaseline:
-    """A lightweight graph-feature baseline shaped like a future GNN evaluator.
+    """Score samples from the preprocess IR without running the agent pipeline.
 
-    It does not claim to be a trained GNN. It scores samples from call graph,
-    CFG/DFG, source/sink, and rule-hit graph features so the project has a
-    stable baseline interface before a real GNN model is provided.
+    Sink, source, sanitizer and cross-file call counts come from the same
+    intermediate representation the GNN baseline consumes. Rule fusion and
+    model scores are intentionally not inputs.
     """
 
-    def __init__(self, config: ScanConfig | None = None) -> None:
-        self.pipeline = VulnerabilityDetectionPipeline(config)
+    def __init__(self) -> None:
+        self.scanner = SourceScanner()
+        self.preprocess = PreprocessAgent()
 
     def evaluate(self, manifest_path: str):
         dataset_name, samples = load_manifest(manifest_path)
@@ -29,13 +31,11 @@ class GraphFeatureBaseline:
         non_exploit_mask: list[bool] = []
         total_loc = 0
         alerts = 0
-        valid_findings = 0
         filtered_non_exploit = 0
 
         for sample in samples:
-            report = self.pipeline.run(sample.path)
-            summary = report.summary
-            score = self._score_summary(summary)
+            ir = self.preprocess.run(self.scanner.collect(sample.path))
+            score = self._score_ir(ir)
             prediction = 1 if score >= 0.5 else 0
             labels.append(sample.label)
             scores.append(score)
@@ -43,8 +43,7 @@ class GraphFeatureBaseline:
             cross_file_mask.append(sample.cross_file)
             exploitable_mask.append(sample.exploitable)
             non_exploit_mask.append(sample.non_exploitable)
-            alerts += int(summary.get("candidate_count", 0))
-            valid_findings += 1 if sample.label == 1 and prediction == 1 else 0
+            alerts += sum(1 for node in ir.source_sink_nodes if node.kind == "sink")
             filtered_non_exploit += 1 if sample.non_exploitable and prediction == 0 else 0
             total_loc += sample.loc or self._count_loc(sample.path)
 
@@ -55,7 +54,6 @@ class GraphFeatureBaseline:
             predictions=predictions,
             alerts=alerts,
             total_loc=total_loc,
-            valid_findings=valid_findings,
             cross_file_mask=cross_file_mask,
             exploitable_mask=exploitable_mask,
             non_exploit_mask=non_exploit_mask,
@@ -64,13 +62,15 @@ class GraphFeatureBaseline:
         metrics.method = "Graph Feature Baseline"
         return metrics
 
-    def _score_summary(self, summary: dict) -> float:
-        candidates = float(summary.get("candidate_count", 0))
-        source_sinks = float(summary.get("source_sink_nodes", 0))
-        call_edges = float(summary.get("call_edges", 0))
-        dfg_edges = float(summary.get("dfg_edges", 0))
-        cfg_edges = float(summary.get("cfg_edges", 0))
-        raw = 0.18 * candidates + 0.08 * source_sinks + 0.01 * call_edges + 0.004 * dfg_edges + 0.002 * cfg_edges
+    def _score_ir(self, ir: CodebaseIR) -> float:
+        sinks = sum(1 for node in ir.source_sink_nodes if node.kind == "sink")
+        sanitizers = sum(
+            1
+            for node in ir.source_sink_nodes
+            if node.kind == "sanitizer" and node.name not in {"strlen", "sizeof"}
+        )
+        cross = sum(1 for edge in ir.call_edges if edge.cross_file)
+        raw = 0.35 * sinks + 0.2 * cross - 0.2 * sanitizers
         return round(max(0.0, min(0.99, raw)), 4)
 
     def _count_loc(self, sample_path: str) -> int:
