@@ -7,7 +7,6 @@ import "@fontsource/dm-sans/700.css";
 import "material-symbols/outlined.css";
 import { api, EvaluationTask, Finding, Rule, ScanTask } from "./api/client";
 import { Icon } from "./components/Icon";
-import { CursorRingField } from "./components/CursorRingField";
 import { MetricCard } from "./components/MetricCard";
 import { StatusPill } from "./components/StatusPill";
 import "./styles/app.css";
@@ -261,7 +260,6 @@ function App() {
 
   return (
     <div className="ring-app min-h-screen text-on-surface font-body antialiased selection:bg-primary/30">
-      <CursorRingField />
       <aside className="glass-nav fixed top-0 left-0 z-40 flex h-full w-64 flex-col justify-between p-4 max-lg:static max-lg:h-auto max-lg:w-full max-lg:flex-row max-lg:items-center max-lg:gap-3">
         <div className="space-y-6 max-lg:flex max-lg:items-center max-lg:gap-4 max-lg:space-y-0">
           <div className="flex items-center gap-3 px-2 pt-2 max-lg:pt-0">

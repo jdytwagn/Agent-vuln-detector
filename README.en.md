@@ -15,7 +15,7 @@
 
 <p align="center"><b>A C/C++ vulnerability console built from rules, data flow, and CodeBERT</b></p>
 
-<p align="center"><i>Seven ordered stages · Local mitigations survive high model scores · White cards and a pale-blue cursor ring · Measured on a small Devign slice</i></p>
+<p align="center"><i>Seven ordered stages · Local mitigations survive high model scores · White stacked cards · Measured on a small Devign slice</i></p>
 
 <p align="center">
   <a href="#architecture">📐 Architecture</a>
@@ -74,19 +74,17 @@ An alert can be walked back to a rule, a path, and a score. The cost is explicit
 - Evidence outranks a lone score. The model moves confidence. It does not overrule a local mitigation by itself.
 - Review is a result. A missing path or conflicting evidence stops for a person.
 - The console is bound to the current SQLite tasks. Counts and metrics come from the run. Cluster status, people, and GPU claims are not invented.
-- The console is white. Navigation, the top bar, metrics, tasks, and the pipeline are separate white cards. A ring of small pale-blue grains appears only after the pointer arrives.
+- The console is white. Navigation, the top bar, metrics, tasks, and the pipeline are separate white cards.
 
 ## Interface
 
 The console is white. The page ground is `#F4F7FB`. Navigation, the top bar, metrics, the task list, severity, and the seven-step pipeline are separate white cards. Metric and rule cards sit one level higher, with a pale-blue hairline and the number in a light sunken well. The active nav item is stroked in `#4C8DFF`. The rules live in `frontend/src/styles/app.css`.
 
-`frontend/src/components/CursorRingField.tsx` uses a canvas that ignores the pointer and stays clear until the mouse arrives. Three rings of small pale-blue capsules, between `#5B9CFF` and `#BAD6FF`, then appear around the pointer. They face the ring center and ease outward, keeping 80% of the previous push each frame. The ring disappears when the pointer leaves.
-
 <p align="center">
-  <img alt="White dashboard with a pale-blue particle ring on the metric card" src="docs/figures/dashboard-hover.jpg" width="920">
+  <img alt="White security dashboard" src="docs/figures/dashboard-hover.jpg" width="920">
 </p>
 
-<p align="center"><i>Dashboard. The pointer rests on Scan Tasks, and the small pale-blue grains appear only around the mouse.</i></p>
+<p align="center"><i>Dashboard. Scan counts, confirmed findings, and severity come from the tasks in the current workspace.</i></p>
 
 <p align="center">
   <img alt="White rule cards, one raised card per CWE rule" src="docs/figures/rules-hover.jpg" width="920">
