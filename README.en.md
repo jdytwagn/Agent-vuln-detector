@@ -15,7 +15,7 @@
 
 <p align="center"><b>A C/C++ vulnerability console built from rules, data flow, and CodeBERT</b></p>
 
-<p align="center"><i>Seven ordered stages · Local mitigations survive high model scores · Frosted cards with hover particles · Measured on a small Devign slice</i></p>
+<p align="center"><i>Seven ordered stages · Local mitigations survive high model scores · Dark stacked cards and a cursor ring · Measured on a small Devign slice</i></p>
 
 <p align="center">
   <a href="#architecture">📐 Architecture</a>
@@ -74,27 +74,25 @@ An alert can be walked back to a rule, a path, and a score. The cost is explicit
 - Evidence outranks a lone score. The model moves confidence. It does not overrule a local mitigation by itself.
 - Review is a result. A missing path or conflicting evidence stops for a person.
 - The console is bound to the current SQLite tasks. Counts and metrics come from the run. Cluster status, people, and GPU claims are not invented.
-- Mineral teal `#0E7C73` sits on a dusk mesh `#D5E6EA`. Facts live on frosted cards. Motion starts only while the pointer is on a card.
+- The page is near-black `#04050A`. Navigation, the top bar, metrics, tasks, and the pipeline are separate cards, and the cursor ring shows through the gaps. Primary is `#2EE6C8`. The ring highlight is `#D6FF4A`.
 
 ## Interface
 
-The page background is `#D5E6EA` plus peach, teal, and lilac radial gradients, so a translucent card still shows the room behind it. Primary is `#0E7C73`, the dim step is `#0A5E57`, and the container tint is `#D7F4EF`.
+The console follows a Stitch dark-card layout. The ground is `#04050A`. Navigation, the top bar, metrics, the task list, severity, and the seven-step pipeline are separate cards, with gaps so the cursor ring stays visible. Large cards use `rgba(11, 16, 26, 0.86)` and a 16px blur. Metric and rule cards sit one level higher, with a `#C6FF4A` hairline on the top edge and the number in a sunken well. Inputs and task rows are darker inset cards. The active nav item is stroked in `#2EE6C8`. The rules live in `frontend/src/styles/app.css`, after the Tailwind utilities.
 
-Module cards, rule cards, and raised cards use white at about 48% opacity, an 18px backdrop blur, and an inner highlight. Hover lifts a card by 4px, raises the white to about 66%, and adds a teal edge. The sidebar is dark glass, `rgba(14, 24, 32, 0.72)`, blurred by 22px. Those rules are in `frontend/src/styles/app.css`, after the Tailwind utilities, so a solid surface color does not paint over the glass.
-
-`frontend/src/components/ParticleField.tsx` draws on a viewport canvas that ignores pointer events. Once the pointer enters `.console-card`, `.card-elevation`, or `.rule-card`, it spawns teal, sand, lilac, and near-white dots. Dots closer than 42px are linked. A stationary pointer keeps spawning every 70ms. At most 70 dots are kept, and drawing is clipped to that card. Reduced-motion preference skips the field and the lift.
+`frontend/src/components/CursorRingField.tsx` paints short cyan capsules on a full-viewport canvas that ignores the pointer. A ring, made from three smoothsteps of distance, turns the capsules it crosses lime `#D6FF4A` and pushes them outward. Each frame keeps 80% of the previous push, so they drift home instead of snapping. Capsules face the ring center, with a little angle noise so they do not line up into spokes. With no pointer, the ring wanders. Reduced motion freezes the field.
 
 <p align="center">
-  <img alt="Frosted dashboard cards with particles inside the scan-task card" src="docs/figures/dashboard-hover.jpg" width="920">
+  <img alt="Dark stacked dashboard cards with a lime cursor ring in the gap" src="docs/figures/dashboard-hover.jpg" width="920">
 </p>
 
-<p align="center"><i>Dashboard. The pointer rests on Scan Tasks, and the particles stay inside that card.</i></p>
+<p align="center"><i>Dashboard. The pointer rests in the gap, and the nearby capsules turn lime and form a ring.</i></p>
 
 <p align="center">
-  <img alt="Rule cards with the same hover particles" src="docs/figures/rules-hover.jpg" width="920">
+  <img alt="Dark rule cards" src="docs/figures/rules-hover.jpg" width="920">
 </p>
 
-<p align="center"><i>Rule library. The same glass and particles are used on the CWE cards.</i></p>
+<p align="center"><i>Rule library. Each CWE rule is its own raised card.</i></p>
 
 ## Results
 

@@ -13,9 +13,9 @@ const STATUS_LABELS: Record<string, string> = {
 const STATUS_TONE: Record<string, string> = {
   pending: "bg-surface-container text-on-surface-variant border border-outline-variant/40",
   running: "bg-primary/10 text-primary border border-primary/30",
-  completed: "bg-emerald-100 text-status-green border border-emerald-300",
-  completed_with_errors: "bg-amber-100 text-status-amber border border-amber-300",
-  failed: "bg-red-100 text-error border border-red-300"
+  completed: "bg-status-green/15 text-status-green border border-status-green/40",
+  completed_with_errors: "bg-status-amber/15 text-status-amber border border-status-amber/40",
+  failed: "bg-error/15 text-error border border-error/40"
 };
 
 export function StatusPill({ status }: Props) {

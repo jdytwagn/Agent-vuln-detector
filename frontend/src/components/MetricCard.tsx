@@ -29,7 +29,7 @@ export function MetricCard({ label, value, hint, icon, tone = "neutral" }: Props
         <span className="text-[13px] font-medium text-on-surface-variant font-label">{label}</span>
         <Icon name={icon} className={`text-lg ${ICON_TONE[tone]}`} />
       </div>
-      <div className="mt-4 flex items-baseline justify-between gap-2">
+      <div className="sunken-panel mt-4 flex items-baseline justify-between gap-2 rounded-lg px-3 py-2.5">
         <span className={`text-3xl font-extrabold tracking-tight font-headline ${TONE[tone]}`}>{value}</span>
         <span className={`text-[11px] font-medium text-right ${tone === "neutral" ? "text-on-surface-variant" : TONE[tone]}`}>{hint}</span>
       </div>

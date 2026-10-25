@@ -7,7 +7,7 @@ import "@fontsource/dm-sans/700.css";
 import "material-symbols/outlined.css";
 import { api, EvaluationTask, Finding, Rule, ScanTask } from "./api/client";
 import { Icon } from "./components/Icon";
-import { ParticleField } from "./components/ParticleField";
+import { CursorRingField } from "./components/CursorRingField";
 import { MetricCard } from "./components/MetricCard";
 import { StatusPill } from "./components/StatusPill";
 import "./styles/app.css";
@@ -260,8 +260,8 @@ function App() {
   };
 
   return (
-    <div className="mesh-app min-h-screen text-on-surface font-body antialiased selection:bg-primary/20">
-      <ParticleField />
+    <div className="ring-app min-h-screen text-on-surface font-body antialiased selection:bg-primary/30">
+      <CursorRingField />
       <aside className="glass-nav fixed top-0 left-0 z-40 flex h-full w-64 flex-col justify-between p-4 max-lg:static max-lg:h-auto max-lg:w-full max-lg:flex-row max-lg:items-center max-lg:gap-3">
         <div className="space-y-6 max-lg:flex max-lg:items-center max-lg:gap-4 max-lg:space-y-0">
           <div className="flex items-center gap-3 px-2 pt-2 max-lg:pt-0">
@@ -270,7 +270,7 @@ function App() {
             </div>
             <div className="flex flex-col">
               <span className="font-display text-base font-bold leading-tight tracking-wide text-on-tertiary">漏洞检测平台</span>
-              <span className="mt-1 font-label text-xs font-medium leading-none tracking-wider text-outline-variant">Agent-based SAST</span>
+              <span className="mt-1 font-label text-xs font-medium leading-none tracking-wider text-primary">Agent-based SAST</span>
             </div>
           </div>
           <nav aria-label="主要导航" className="space-y-1.5 max-lg:flex max-lg:gap-1 max-lg:space-y-0 max-lg:overflow-x-auto">
@@ -284,8 +284,8 @@ function App() {
                   onClick={() => setTab(item.id)}
                   className={`flex w-full items-center gap-3 rounded-lg px-3.5 py-2.5 text-left font-label text-sm transition-all duration-150 max-lg:w-auto max-lg:shrink-0 ${
                     active
-                      ? "border-l-2 border-primary bg-primary/20 font-semibold text-primary-container"
-                      : "text-outline-variant hover:bg-surface-variant/10 hover:text-on-tertiary"
+                      ? "border border-[#2EE6C8] bg-[#2EE6C8]/10 font-semibold text-[#E8F7F4] shadow-[0_0_18px_rgba(46,230,200,0.18),inset_0_0_12px_rgba(46,230,200,0.08)]"
+                      : "border border-transparent text-outline-variant hover:border-white/10 hover:bg-white/5 hover:text-on-tertiary"
                   }`}
                 >
                   <Icon name={item.icon} filled={active} className="text-xl" />
@@ -303,7 +303,7 @@ function App() {
         </div>
       </aside>
 
-      <div className="ml-64 flex min-h-screen flex-col max-lg:ml-0">
+      <div className="relative z-10 ml-[18.75rem] flex min-h-screen flex-col max-lg:ml-0">
         <header className="glass-bar sticky top-0 z-30 flex h-16 w-full items-center justify-between px-8">
           <div className="flex items-center gap-3 font-headline text-sm font-medium text-on-surface-variant">
             <span>安全扫描控制台</span>
@@ -463,7 +463,7 @@ function App() {
                 <p className="font-label text-sm text-outline">选择源码、模型后端和严格模式，然后提交路径或压缩包。</p>
               </div>
               <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-                <section className="console-card flex h-full flex-col justify-between rounded-xl bg-white p-6 lg:col-span-4">
+                <section className="console-card flex h-full flex-col justify-between rounded-xl bg-surface p-6 lg:col-span-4">
                   <div className="space-y-5">
                     <div className="flex items-center gap-2.5 border-b border-outline-variant/20 pb-3">
                       <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-surface-container text-primary">
@@ -500,7 +500,7 @@ function App() {
                     <span>{rules.length} 条规则</span>
                   </div>
                 </section>
-                <section className="console-card rounded-xl bg-white p-6 lg:col-span-8">
+                <section className="console-card rounded-xl bg-surface p-6 lg:col-span-8">
                   <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void submitScan(); }}>
                     <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
                       <div>
@@ -517,7 +517,7 @@ function App() {
                       <div className="inset-surface flex items-center gap-3 rounded-lg px-3.5 py-2.5">
                         <Icon name="folder_open" className="text-lg text-outline-variant" />
                         <input id="source-path" value={sourcePath} onChange={(event) => setSourcePath(event.target.value)} className="w-full border-0 bg-transparent p-0 font-mono text-sm text-on-surface placeholder:text-outline-variant focus:ring-0" />
-                        <span className="rounded border border-outline-variant/30 bg-white/80 px-1.5 py-0.5 font-mono text-[11px] uppercase text-outline-variant">工作区</span>
+                        <span className="rounded border border-outline-variant/30 bg-surface/80 px-1.5 py-0.5 font-mono text-[11px] uppercase text-outline-variant">工作区</span>
                       </div>
                       <p className="text-[11px] text-outline">相对仓库根目录，或后端允许的绝对路径。</p>
                     </div>
@@ -578,7 +578,7 @@ function App() {
                   </form>
                 </section>
               </div>
-              <div className="console-card flex flex-wrap items-center justify-between gap-4 rounded-xl bg-white/90 p-4 text-xs">
+              <div className="console-card flex flex-wrap items-center justify-between gap-4 rounded-xl bg-surface/90 p-4 text-xs">
                 <div className="flex flex-wrap items-center gap-6">
                   <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-primary" /><span className="text-outline">模型后端</span><span className="font-mono font-semibold text-on-surface">{modelBackend}</span></span>
                   <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-secondary" /><span className="text-outline">严格模式</span><span className="font-mono font-semibold text-on-surface">{modelBackend !== "mock" && strictModel ? "开" : "关"}</span></span>
@@ -640,7 +640,7 @@ function App() {
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-md border border-outline-variant/30 bg-surface-container px-2.5 py-1 font-mono text-xs text-on-surface">结果 <span className="font-bold">{findings.length}</span></span>
-                      <span className="rounded-md border border-error/30 bg-red-50 px-2.5 py-1 font-mono text-xs font-semibold text-error">确认漏洞 <span className="font-bold">{findingCounts.vulnerable}</span></span>
+                      <span className="rounded-md border border-error/30 bg-error/15 px-2.5 py-1 font-mono text-xs font-semibold text-error">确认漏洞 <span className="font-bold">{findingCounts.vulnerable}</span></span>
                       <button
                         type="button"
                         onClick={() => {
@@ -648,18 +648,18 @@ function App() {
                           if (!review) return;
                           document.getElementById(`finding-${review.candidate_id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
                         }}
-                        className="rounded-md border border-status-amber/30 bg-amber-50 px-2.5 py-1 font-mono text-xs font-semibold text-status-amber"
+                        className="rounded-md border border-status-amber/30 bg-status-amber/15 px-2.5 py-1 font-mono text-xs font-semibold text-status-amber"
                       >
                         待复核 <span className="font-bold">{findingCounts.needs_review}</span>
                       </button>
                     </div>
                   </div>
-                  {selectedScan?.error ? <p className="rounded-lg border border-error/30 bg-red-50 px-4 py-3 text-sm text-error">{selectedScan.error}</p> : null}
+                  {selectedScan?.error ? <p className="rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{selectedScan.error}</p> : null}
                   {selectedScan?.summary_json?.model_fallback ? (
-                    <div className="rounded-lg border border-status-amber/40 bg-amber-50 px-4 py-3 text-sm text-status-amber">模型未能加载，本次结果已降级为 mock：{String(selectedScan.summary_json.model_load_error ?? "")}</div>
+                    <div className="rounded-lg border border-status-amber/40 bg-status-amber/10 px-4 py-3 text-sm text-status-amber">模型未能加载，本次结果已降级为 mock：{String(selectedScan.summary_json.model_load_error ?? "")}</div>
                   ) : null}
                   {selectedScan?.summary_json?.parser_fallback ? (
-                    <div className="rounded-lg border border-status-amber/40 bg-amber-50 px-4 py-3 text-sm text-status-amber">Tree-sitter 不可用，预处理已退回轻量解析：{String(selectedScan.summary_json.parser_error ?? "")}</div>
+                    <div className="rounded-lg border border-status-amber/40 bg-status-amber/10 px-4 py-3 text-sm text-status-amber">Tree-sitter 不可用，预处理已退回轻量解析：{String(selectedScan.summary_json.parser_error ?? "")}</div>
                   ) : null}
                   <FindingList findings={findings} />
                 </div>
@@ -692,7 +692,7 @@ function App() {
               <div className="console-card flex flex-col items-center justify-between gap-3 rounded-lg p-3.5 md:flex-row">
                 <div className="relative w-full md:w-80">
                   <Icon name="search" className="absolute left-3 top-2 text-lg text-on-surface-variant" />
-                  <input value={ruleQuery} onChange={(event) => setRuleQuery(event.target.value)} placeholder="搜索规则名、CWE 编号、危险函数" className="w-full rounded-md border border-outline-variant/40 bg-surface-variant py-1.5 pl-9 pr-3 text-xs text-on-surface placeholder:text-outline-variant focus:border-primary focus:bg-white focus:outline-none" />
+                  <input value={ruleQuery} onChange={(event) => setRuleQuery(event.target.value)} placeholder="搜索规则名、CWE 编号、危险函数" className="w-full rounded-md border border-outline-variant/40 bg-surface-variant py-1.5 pl-9 pr-3 text-xs text-on-surface placeholder:text-outline-variant focus:border-primary focus:bg-surface-container-lowest focus:outline-none" />
                 </div>
                 <div className="flex w-full items-center gap-4 overflow-x-auto md:w-auto">
                   <div className="flex items-center gap-1 text-xs">
@@ -758,7 +758,7 @@ function App() {
                   <h2 className="font-headline text-2xl font-bold tracking-tight text-on-surface">实验评测</h2>
                   <p className="mt-1 font-label text-sm text-on-surface-variant">用清单跑当前流水线，需要时再加基线对照。</p>
                 </div>
-                <div className="inline-flex items-center gap-2 rounded-lg border border-outline-variant/40 bg-white/70 px-3 py-1.5 text-xs text-on-surface-variant">
+                <div className="inline-flex items-center gap-2 rounded-lg border border-outline-variant/40 bg-surface/70 px-3 py-1.5 text-xs text-on-surface-variant">
                   <Icon name="description" className="text-sm text-primary" />
                   <span>清单 <span className="font-mono font-medium text-on-surface">{manifestPath}</span></span>
                 </div>
@@ -818,7 +818,7 @@ function App() {
                           <Toggle checked={skipCodeModels} onChange={setSkipCodeModels} title="跳过 CodeBERT / GraphCodeBERT 纯模型基线" description="套件里不单独加载这两套权重。" />
                           <label className="flex items-center justify-between gap-3 rounded-lg border border-outline-variant/30 bg-surface-variant p-3 text-xs">
                             <span className="font-semibold text-on-surface">GNN 训练轮次</span>
-                            <input type="number" min={1} max={200} value={gnnEpochs} onChange={(event) => setGnnEpochs(Number(event.target.value) || 1)} className="w-24 rounded-md border border-outline-variant/40 bg-white px-2 py-1 text-right font-mono text-xs focus:border-primary focus:ring-1 focus:ring-primary" />
+                            <input type="number" min={1} max={200} value={gnnEpochs} onChange={(event) => setGnnEpochs(Number(event.target.value) || 1)} className="w-24 rounded-md border border-outline-variant/40 bg-surface px-2 py-1 text-right font-mono text-xs focus:border-primary focus:ring-1 focus:ring-primary" />
                           </label>
                         </>
                       ) : null}
@@ -924,7 +924,7 @@ function FindingTaskCard({ scan, selected, onSelect }: { scan: ScanTask; selecte
       {scan.status === "failed" ? (
         <span className="block text-left text-[11px] text-error">{scan.error || "扫描失败"}</span>
       ) : (
-        <span className="my-2.5 grid grid-cols-2 gap-2 rounded border border-outline-variant/20 bg-white/80 p-2">
+        <span className="my-2.5 grid grid-cols-2 gap-2 rounded border border-outline-variant/20 bg-surface/80 p-2">
           <span className="text-[11px] text-on-surface-variant">确认 <span className="font-mono text-sm font-bold text-error">{counts.confirmed}</span></span>
           <span className="text-[11px] text-on-surface-variant">复核 <span className="font-mono text-sm font-bold text-status-amber">{counts.review}</span></span>
         </span>
@@ -986,10 +986,10 @@ function PipelinePanel({ scan }: { scan?: ScanTask }) {
         </div>
       </div>
       <div className="relative px-1 py-2">
-        <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
-          <div className="animate-scan-beam h-full w-24 bg-gradient-to-r from-transparent via-primary-container/50 to-transparent" />
+        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+          <div className="animate-scan-beam h-full w-24 bg-gradient-to-r from-transparent via-primary/15 to-transparent" />
         </div>
-        <div className="relative z-0 grid grid-cols-1 gap-3 md:grid-cols-7">
+        <div className="relative z-10 grid grid-cols-1 gap-3 md:grid-cols-7">
           {PIPELINE.map((step, index) => {
             const last = index === PIPELINE.length - 1;
             return (
@@ -1061,7 +1061,7 @@ function FindingArticle({ item }: { item: Finding }) {
         </div>
         <div className="flex items-center gap-2">
           <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-wider ${severityPill(item.final_severity)}`}>{item.final_severity}</span>
-          {review ? <span className="rounded-full border border-status-amber/40 bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-status-amber">待复核</span> : null}
+          {review ? <span className="rounded-full border border-status-amber/40 bg-status-amber/15 px-2.5 py-0.5 text-xs font-semibold text-status-amber">待复核</span> : null}
         </div>
       </div>
       <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-outline-variant/20 pb-4">
@@ -1069,7 +1069,7 @@ function FindingArticle({ item }: { item: Finding }) {
         {item.rule_evidence.owasp ? <span className="rounded border border-outline-variant/30 bg-surface-container px-2.5 py-0.5 font-mono text-xs text-on-surface-variant">{item.rule_evidence.owasp}</span> : null}
         <span className={`rounded border px-2.5 py-0.5 text-xs font-medium ${decisionTone(item.final_decision)}`}>{decisionLabel(item.final_decision)}</span>
         <span className="rounded border border-primary/30 bg-primary/10 px-2.5 py-0.5 font-mono text-xs font-semibold text-primary">置信度 {item.final_confidence}</span>
-        {item.model_score ? <span className="rounded border border-outline-variant/30 bg-slate-100 px-2.5 py-0.5 font-mono text-xs text-on-surface-variant">模型 {item.model_score.score}</span> : null}
+        {item.model_score ? <span className="rounded border border-outline-variant/30 bg-surface-container px-2.5 py-0.5 font-mono text-xs text-on-surface-variant">模型 {item.model_score.score}</span> : null}
       </div>
       <div className="mb-5 overflow-hidden rounded-lg border border-black/40 bg-code-bg shadow-inner">
         <div className="flex items-center justify-between bg-black/40 px-4 py-1.5 font-mono text-[11px] text-outline-variant">
@@ -1093,7 +1093,7 @@ function FindingArticle({ item }: { item: Finding }) {
           {steps.length ? (
             <ol className="relative z-10 grid grid-cols-1 gap-3 md:grid-cols-3">
               {steps.map((step, index) => (
-                <li key={`${item.candidate_id}-${index}`} className="rounded border border-outline-variant/30 bg-white p-2.5 shadow-sm">
+                <li key={`${item.candidate_id}-${index}`} className="rounded border border-outline-variant/30 bg-surface p-2.5 shadow-sm">
                   <div className="mb-1 text-[11px] font-semibold text-primary">{index + 1}</div>
                   <div className="font-mono text-xs text-on-surface">{step}</div>
                 </li>
@@ -1320,26 +1320,26 @@ function decisionLabel(decision: string) {
 }
 
 function decisionTone(decision: string) {
-  if (decision === "vulnerable") return "border-error/30 bg-red-100 text-error";
-  if (decision === "needs_review") return "border-amber-300 bg-amber-100 text-status-amber";
-  if (decision === "filtered_false_positive") return "border-outline-variant/40 bg-surface-container text-outline";
-  return "border-emerald-300 bg-emerald-50 text-status-green";
+  if (decision === "vulnerable") return "border-error/40 bg-error/15 text-error";
+  if (decision === "needs_review") return "border-status-amber/40 bg-status-amber/15 text-status-amber";
+  if (decision === "filtered_false_positive") return "border-outline-variant/50 bg-surface-container text-on-surface-variant";
+  return "border-status-green/40 bg-status-green/15 text-status-green";
 }
 
 function severityPill(severity: string) {
   const value = severity.toLowerCase();
-  if (value === "critical") return "bg-error text-white";
-  if (value === "high") return "bg-status-amber text-white";
-  if (value === "medium") return "border border-amber-300 bg-amber-100 text-status-amber";
-  return "border border-slate-300 bg-slate-100 text-slate-700";
+  if (value === "critical") return "bg-error text-[#2A0908]";
+  if (value === "high") return "bg-status-amber text-[#241804]";
+  if (value === "medium") return "border border-status-amber/40 bg-status-amber/15 text-status-amber";
+  return "border border-outline-variant bg-surface-container text-on-surface-variant";
 }
 
 function severityBadge(severity: string) {
   const value = severity.toLowerCase();
-  if (value === "critical") return "border-[#FA746F]/40 bg-[#FDF2F2] text-[#A83836]";
-  if (value === "high") return "border-amber-300 bg-amber-50 text-amber-700";
-  if (value === "medium") return "border-amber-200 bg-amber-50/80 text-amber-800";
-  return "border-slate-300 bg-slate-100 text-slate-700";
+  if (value === "critical") return "border-error/40 bg-error/15 text-error";
+  if (value === "high") return "border-status-amber/40 bg-status-amber/15 text-status-amber";
+  if (value === "medium") return "border-status-amber/30 bg-status-amber/10 text-status-amber";
+  return "border-outline-variant bg-surface-container text-on-surface-variant";
 }
 
 function titleFor(tab: Tab) {
