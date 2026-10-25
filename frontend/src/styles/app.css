@@ -118,80 +118,70 @@
 @tailwind utilities;
 
 .ring-app {
-  background-color: #04050a;
+  background-color: #f4f7fb;
 }
 
 .glass-nav {
   margin: 16px;
   height: calc(100% - 32px) !important;
   width: 16rem;
-  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.9) !important;
   border-radius: 16px;
-  background: rgba(11, 16, 26, 0.82) !important;
-  box-shadow: 0 18px 38px -10px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: 0 16px 36px rgba(28, 52, 84, 0.08), inset 0 1px 0 rgba(255, 255, 255, 1);
 }
 
 .glass-bar {
   margin: 16px 16px 0;
   width: auto !important;
   height: 3.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(213, 222, 232, 0.9) !important;
   border-radius: 16px;
-  background: rgba(11, 16, 26, 0.72) !important;
-  box-shadow: 0 12px 28px -12px rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.92) !important;
+  box-shadow: 0 10px 24px rgba(28, 52, 84, 0.06);
 }
 
 .console-card {
-  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(213, 222, 232, 0.95) !important;
   border-radius: 16px;
-  background: rgba(11, 16, 26, 0.86) !important;
-  box-shadow: 0 18px 38px -10px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: #ffffff !important;
+  box-shadow: 0 16px 34px rgba(28, 52, 84, 0.08), inset 0 1px 0 rgba(255, 255, 255, 1);
 }
 
 .card-elevation,
 .rule-card {
-  border: 1px solid rgba(46, 230, 200, 0.14) !important;
+  border: 1px solid rgba(180, 206, 240, 0.9) !important;
   border-radius: 16px;
-  background: linear-gradient(180deg, rgba(15, 22, 34, 0.92), rgba(9, 13, 21, 0.94)) !important;
-  box-shadow: 0 20px 35px -8px rgba(0, 0, 0, 0.85), inset 0 1px 0 0 rgba(198, 255, 74, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: linear-gradient(180deg, #ffffff, #f8fbff) !important;
+  box-shadow: 0 14px 28px rgba(28, 52, 84, 0.1), inset 0 1px 0 0 #b9d4ff;
   transition: transform 0.28s ease, box-shadow 0.28s ease;
 }
 
 .card-elevation:hover,
 .rule-card:hover {
   transform: translateY(-6px);
-  box-shadow: 0 22px 40px rgba(0, 0, 0, 0.48), 0 0 28px rgba(46, 230, 200, 0.14);
+  box-shadow: 0 20px 36px rgba(76, 141, 255, 0.16), inset 0 1px 0 0 #8eb6ff;
 }
 
 .sunken-panel,
 .inset-surface {
-  background: rgba(4, 7, 13, 0.88) !important;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.75), 0 1px 0 rgba(255, 255, 255, 0.02);
-  color: #e8f7f4;
+  background: #f3f6fb !important;
+  border: 1px solid #e1e8f2;
+  box-shadow: inset 0 1px 2px rgba(28, 52, 84, 0.06);
+  color: #1b2836;
 }
 
 .inset-surface:focus-within {
-  background: rgba(4, 7, 13, 0.94) !important;
-  border-color: rgba(46, 230, 200, 0.55);
-  box-shadow: 0 0 0 1px rgba(46, 230, 200, 0.35);
+  background: #ffffff !important;
+  border-color: #4c8dff;
+  box-shadow: 0 0 0 1px rgba(76, 141, 255, 0.35);
 }
 
 footer {
   margin: 0 12px 12px;
-  border: 1px solid rgba(46, 230, 200, 0.12) !important;
+  border: 1px solid #e1e8f2 !important;
   border-radius: 14px;
-  background: rgba(6, 10, 14, 0.55) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.94) !important;
 }
 
 @media (max-width: 1023px) {

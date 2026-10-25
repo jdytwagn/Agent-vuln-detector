@@ -265,7 +265,7 @@ function App() {
       <aside className="glass-nav fixed top-0 left-0 z-40 flex h-full w-64 flex-col justify-between p-4 max-lg:static max-lg:h-auto max-lg:w-full max-lg:flex-row max-lg:items-center max-lg:gap-3">
         <div className="space-y-6 max-lg:flex max-lg:items-center max-lg:gap-4 max-lg:space-y-0">
           <div className="flex items-center gap-3 px-2 pt-2 max-lg:pt-0">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-primary/40 bg-primary/20 text-primary-container">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-primary/30 bg-primary/10 text-primary">
               <Icon name="shield" className="text-xl" />
             </div>
             <div className="flex flex-col">
@@ -284,8 +284,8 @@ function App() {
                   onClick={() => setTab(item.id)}
                   className={`flex w-full items-center gap-3 rounded-lg px-3.5 py-2.5 text-left font-label text-sm transition-all duration-150 max-lg:w-auto max-lg:shrink-0 ${
                     active
-                      ? "border border-[#2EE6C8] bg-[#2EE6C8]/10 font-semibold text-[#E8F7F4] shadow-[0_0_18px_rgba(46,230,200,0.18),inset_0_0_12px_rgba(46,230,200,0.08)]"
-                      : "border border-transparent text-outline-variant hover:border-white/10 hover:bg-white/5 hover:text-on-tertiary"
+                      ? "border border-primary bg-primary/10 font-semibold text-on-surface shadow-[0_8px_18px_rgba(76,141,255,0.12)]"
+                      : "border border-transparent text-on-surface-variant hover:border-primary/20 hover:bg-primary/5 hover:text-on-surface"
                   }`}
                 >
                   <Icon name={item.icon} filled={active} className="text-xl" />
@@ -1328,8 +1328,8 @@ function decisionTone(decision: string) {
 
 function severityPill(severity: string) {
   const value = severity.toLowerCase();
-  if (value === "critical") return "bg-error text-[#2A0908]";
-  if (value === "high") return "bg-status-amber text-[#241804]";
+  if (value === "critical") return "bg-error text-white";
+  if (value === "high") return "bg-status-amber text-white";
   if (value === "medium") return "border border-status-amber/40 bg-status-amber/15 text-status-amber";
   return "border border-outline-variant bg-surface-container text-on-surface-variant";
 }

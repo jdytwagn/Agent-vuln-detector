@@ -15,7 +15,7 @@
 
 <p align="center"><b>基于规则、数据流与 CodeBERT 的 C/C++ 漏洞检测控制台</b></p>
 
-<p align="center"><i>七步顺序判定 · 局部缓解不被模型分覆盖 · 深色叠卡与光标环粒子 · Devign 小样本实测</i></p>
+<p align="center"><i>七步顺序判定 · 局部缓解不被模型分覆盖 · 白底叠卡与淡蓝光标环 · Devign 小样本实测</i></p>
 
 <p align="center">
   <a href="#设计架构">📐 设计架构</a>
@@ -74,22 +74,22 @@ flowchart LR
 - 证据优先于分数。模型分参与置信度，但不能单方面覆盖局部缓解。
 - 复核是一种结果，不是失败状态。路径不完整或证据互相矛盾时停在人工复核。
 - 控制台绑定当前 SQLite 任务。扫描数、确认数和评测指标都来自这次运行，不写死集群、人员和 GPU。
-- 界面底色是近黑 `#04050A`。导航、顶栏、指标、任务和链路各自是一层卡片，缝隙留给光标环。主色 `#2EE6C8`，环上的高光是 `#D6FF4A`。
+- 界面是白底亮色。导航、顶栏、指标、任务和链路各自是一层白色卡片。鼠标到达后，指针周围才出现一圈淡蓝小颗粒。
 
 ## 界面实现
 
-控制台按 Stitch 的深色叠卡稿来排。底色是 `#04050A`，导航、顶栏、指标、任务概览、严重等级和七步链路都是分开的卡片，卡片之间留缝，光标环从缝里露出来。大卡用 `rgba(11, 16, 26, 0.86)` 和 16px 模糊。指标卡和规则卡再抬高一层，顶边有一条 `#C6FF4A` 高光，内部数字落在下凹槽里。输入框和任务行是更深的内嵌卡。当前导航项用 `#2EE6C8` 实线描边。样式在 `frontend/src/styles/app.css`，放在 Tailwind 工具类之后。
+控制台是白底。页面底色 `#F4F7FB`，导航、顶栏、指标、任务概览、严重等级和七步链路都是分开的白卡片。指标卡和规则卡再抬高一层，顶边有一条淡蓝高光，数字落在浅灰下凹槽里。当前导航项用 `#4C8DFF` 描边。样式在 `frontend/src/styles/app.css`。
 
-粒子在 `frontend/src/components/CursorRingField.tsx`。全屏画布不接收指针，铺一层青色短胶囊。光环用三段 smoothstep 算距离，扫过的胶囊转向青柠 `#D6FF4A`，并被沿径向推开；位移每帧保留 80%，松手后漂回原位。胶囊朝向环心，再加一点角度噪声，避免排成辐条。没有指针时环会自己缓慢游走。系统开启“减少动态效果”时场保持静止。
+粒子在 `frontend/src/components/CursorRingField.tsx`。画布不接收指针，平时是透明的。鼠标进入页面后，指针周围才画出三圈淡蓝小胶囊，颜色在 `#5B9CFF` 和 `#BAD6FF` 之间。胶囊朝向环心，并沿径向轻轻推开，位移每帧保留 80%。鼠标离开后环消失。
 
 <p align="center">
-  <img alt="深色叠卡仪表盘，缝隙里是青色胶囊和青柠光环" src="docs/figures/dashboard-hover.jpg" width="920">
+  <img alt="白底仪表盘，鼠标停在指标卡上时出现淡蓝小颗粒环" src="docs/figures/dashboard-hover.jpg" width="920">
 </p>
 
-<p align="center"><i>仪表盘。指针停在侧栏和任务卡之间，附近胶囊变成青柠并围成环。</i></p>
+<p align="center"><i>仪表盘。指针停在“扫描任务”上，淡蓝小颗粒只出现在鼠标周围。</i></p>
 
 <p align="center">
-  <img alt="规则库深色卡片" src="docs/figures/rules-hover.jpg" width="920">
+  <img alt="白底规则库，每条 CWE 规则是一张抬升卡" src="docs/figures/rules-hover.jpg" width="920">
 </p>
 
 <p align="center"><i>规则库。每条 CWE 规则是一张独立的抬升卡。</i></p>
