@@ -109,9 +109,79 @@
   }
 
   .card-elevation:hover,
-  .rule-card:hover {
+  .rule-card:hover,
+  .console-card:hover {
     transform: none;
   }
 }
 
 @tailwind utilities;
+
+.mesh-app {
+  background-color: #d5e6ea;
+  background-image:
+    radial-gradient(860px 500px at 0% -8%, rgba(255, 186, 122, 0.78), transparent 58%),
+    radial-gradient(760px 540px at 100% 0%, rgba(78, 190, 186, 0.5), transparent 56%),
+    radial-gradient(920px 580px at 78% 108%, rgba(168, 150, 214, 0.42), transparent 54%),
+    radial-gradient(680px 420px at 18% 100%, rgba(255, 255, 255, 0.78), transparent 52%);
+  background-attachment: fixed;
+}
+
+.glass-nav {
+  background: rgba(14, 24, 32, 0.72) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 8px 0 32px rgba(14, 24, 32, 0.12);
+  backdrop-filter: blur(22px) saturate(1.35);
+  -webkit-backdrop-filter: blur(22px) saturate(1.35);
+}
+
+.glass-bar {
+  background: rgba(255, 255, 255, 0.42) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+}
+
+.console-card,
+.card-elevation,
+.rule-card {
+  background: rgba(255, 255, 255, 0.48) !important;
+  border: 1px solid rgba(255, 255, 255, 0.68) !important;
+  box-shadow: 0 14px 34px rgba(24, 49, 61, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(18px) saturate(1.45);
+  -webkit-backdrop-filter: blur(18px) saturate(1.45);
+  transition: transform 0.28s ease, box-shadow 0.28s ease, background 0.28s ease, border-color 0.28s ease;
+}
+
+.console-card:hover,
+.card-elevation:hover,
+.rule-card:hover {
+  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.66) !important;
+  border-color: rgba(14, 124, 115, 0.42) !important;
+  box-shadow: 0 20px 44px rgba(24, 49, 61, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.94);
+}
+
+.sunken-panel {
+  background: rgba(255, 255, 255, 0.36) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+footer {
+  background: rgba(255, 255, 255, 0.34) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .console-card,
+  .card-elevation,
+  .rule-card,
+  .console-card:hover,
+  .card-elevation:hover,
+  .rule-card:hover {
+    transition: none;
+    transform: none;
+  }
+}

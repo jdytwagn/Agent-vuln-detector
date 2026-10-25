@@ -7,6 +7,7 @@ import "@fontsource/dm-sans/700.css";
 import "material-symbols/outlined.css";
 import { api, EvaluationTask, Finding, Rule, ScanTask } from "./api/client";
 import { Icon } from "./components/Icon";
+import { ParticleField } from "./components/ParticleField";
 import { MetricCard } from "./components/MetricCard";
 import { StatusPill } from "./components/StatusPill";
 import "./styles/app.css";
@@ -259,8 +260,9 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-on-surface font-body antialiased selection:bg-primary/20">
-      <aside className="fixed top-0 left-0 z-40 flex h-full w-64 flex-col justify-between border-r border-outline-variant/10 bg-inverse-surface p-4 shadow-sm max-lg:static max-lg:h-auto max-lg:w-full max-lg:flex-row max-lg:items-center max-lg:gap-3">
+    <div className="mesh-app min-h-screen text-on-surface font-body antialiased selection:bg-primary/20">
+      <ParticleField />
+      <aside className="glass-nav fixed top-0 left-0 z-40 flex h-full w-64 flex-col justify-between p-4 max-lg:static max-lg:h-auto max-lg:w-full max-lg:flex-row max-lg:items-center max-lg:gap-3">
         <div className="space-y-6 max-lg:flex max-lg:items-center max-lg:gap-4 max-lg:space-y-0">
           <div className="flex items-center gap-3 px-2 pt-2 max-lg:pt-0">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-primary/40 bg-primary/20 text-primary-container">
@@ -301,8 +303,8 @@ function App() {
         </div>
       </aside>
 
-      <div className="page-highlight ml-64 flex min-h-screen flex-col bg-background max-lg:ml-0">
-        <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-outline-variant/30 bg-surface-container-low/80 px-8 backdrop-blur-sm">
+      <div className="ml-64 flex min-h-screen flex-col max-lg:ml-0">
+        <header className="glass-bar sticky top-0 z-30 flex h-16 w-full items-center justify-between px-8">
           <div className="flex items-center gap-3 font-headline text-sm font-medium text-on-surface-variant">
             <span>安全扫描控制台</span>
             <span className="text-outline-variant">/</span>
