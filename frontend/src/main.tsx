@@ -164,7 +164,7 @@ function App() {
     <main className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <ShieldAlert size={28} />
+          <span className="brand-mark"><ShieldAlert size={18} /></span>
           <div>
             <strong>漏洞检测平台</strong>
             <span>Agent-based SAST</span>
@@ -175,15 +175,22 @@ function App() {
         <button className={tab === "findings" ? "active" : ""} onClick={() => setTab("findings")}><ListChecks size={18} />漏洞详情</button>
         <button className={tab === "rules" ? "active" : ""} onClick={() => setTab("rules")}><FileCode2 size={18} />规则库</button>
         <button className={tab === "evaluation" ? "active" : ""} onClick={() => setTab("evaluation")}><FlaskConical size={18} />评测</button>
+        <div className="sidebar-foot">
+          <span>引擎</span>
+          <span>0.1.0</span>
+        </div>
       </aside>
 
       <section className="workspace">
         <header className="topbar">
           <div>
+            <p className="crumb">安全扫描控制台 / {titleFor(tab)}</p>
             <h1>{titleFor(tab)}</h1>
-            <p>规则、模型、数据流、语义和可利用性共同形成最终判定。</p>
           </div>
-          <button className="icon-button" onClick={() => refresh()} title="刷新"><RefreshCw size={18} /></button>
+          <div className="top-actions">
+            {selectedScan ? <span className="model-chip">{selectedScan.model_backend}</span> : null}
+            <button className="icon-button" onClick={() => refresh()} title="刷新"><RefreshCw size={18} /></button>
+          </div>
         </header>
 
         {message && <div className="notice">{message}</div>}
@@ -191,11 +198,11 @@ function App() {
         <div className="tab-panel" key={tab}>
         {tab === "dashboard" && (
           <section className="content-grid">
-            <MetricCard label="扫描任务" value={scans.length} />
-            <MetricCard label="已完成" value={dashboard.completed} tone="success" />
-            <MetricCard label="确认漏洞" value={dashboard.confirmed} tone="danger" />
-            <MetricCard label="待复核" value={dashboard.review} tone="warning" />
-            <MetricCard label="误报过滤" value={dashboard.filtered} />
+            <MetricCard label="扫描任务" value={scans.length} hint="全部任务" />
+            <MetricCard label="已完成" value={dashboard.completed} hint="含部分失败" tone="success" />
+            <MetricCard label="确认漏洞" value={dashboard.confirmed} hint="融合判定为漏洞" tone="danger" />
+            <MetricCard label="待复核" value={dashboard.review} hint="模型与缓解不一致" tone="warning" />
+            <MetricCard label="误报过滤" value={dashboard.filtered} hint="不计入确认" />
             <section className="panel wide">
               <h2>任务概览</h2>
               <TaskTable scans={scans} selectedScanId={selectedScanId} onSelect={selectScan} />
@@ -208,8 +215,20 @@ function App() {
             <section className="panel span-all">
               <h2>判定链路</h2>
               <ol className="pipeline">
-                {["预处理", "规则召回", "数据流", "模型打分", "语义解释", "可利用性", "融合判定"].map((step) => (
-                  <li key={step}>{step}</li>
+                {[
+                  ["01", "预处理", "结构"],
+                  ["02", "规则召回", "命中"],
+                  ["03", "数据流", "可达"],
+                  ["04", "模型打分", "概率"],
+                  ["05", "语义解释", "说明"],
+                  ["06", "可利用性", "约束"],
+                  ["07", "融合判定", "结论"]
+                ].map(([index, name, hint]) => (
+                  <li key={index}>
+                    <span>{index}</span>
+                    <strong>{name}</strong>
+                    <em>{hint}</em>
+                  </li>
                 ))}
               </ol>
             </section>
@@ -251,16 +270,18 @@ function App() {
                 />
               </div>
             )}
-            {modelBackend !== "mock" && (
+            <div className="check-grid">
+              {modelBackend !== "mock" && (
+                <label className="check-row">
+                  <input type="checkbox" checked={strictModel} onChange={(event) => setStrictModel(event.target.checked)} />
+                  严格模型模式
+                </label>
+              )}
               <label className="check-row">
-                <input type="checkbox" checked={strictModel} onChange={(event) => setStrictModel(event.target.checked)} />
-                严格模型模式
+                <input type="checkbox" checked={enableLlm} onChange={(event) => setEnableLlm(event.target.checked)} />
+                启用 DeepSeek 语义推理
               </label>
-            )}
-            <label className="check-row">
-              <input type="checkbox" checked={enableLlm} onChange={(event) => setEnableLlm(event.target.checked)} />
-              启用 DeepSeek 语义推理
-            </label>
+            </div>
             <div className="actions">
               <button onClick={submitScan} disabled={busy}>扫描路径</button>
               <label className="file-button">
@@ -492,7 +513,10 @@ function FindingList({ findings }: { findings: Finding[] }) {
             <span>置信度 {item.final_confidence}</span>
             {item.model_score ? <span>模型 {item.model_score.score}</span> : null}
           </div>
-          <pre>{item.code}</pre>
+          <div className="code-block">
+            <div className="code-head">{item.file_path}:{item.line}</div>
+            <pre>{item.code}</pre>
+          </div>
           <p>{item.semantic_explanation}</p>
           <ol>
             {(item.dataflow?.steps ?? []).map((step) => <li key={step}>{step}</li>)}
